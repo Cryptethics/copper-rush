@@ -1,0 +1,520 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Prize Pool Breakdown — Copper Rush</title>
+  <script src="https://cdn.jsdelivr.net/npm/@solana/web3.js@1.87.6/lib/index.iife.min.js"></script>
+  <style>
+    :root {
+      --bg: #0b0f14;
+      --surface: rgba(18,28,40,0.9);
+      --surface-2: rgba(10,14,20,0.92);
+      --text: #e6eef8;
+      --muted: rgba(230,238,248,0.5);
+      --dim: rgba(230,238,248,0.3);
+      --gold: #fbbf24;
+      --gold-soft: rgba(251,191,36,0.18);
+      --gold-bg: rgba(251,191,36,0.04);
+      --border: rgba(255,255,255,0.08);
+    }
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0;
+      min-height: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+    }
+    a { color: var(--gold); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+
+    .page {
+      max-width: 980px;
+      margin: 0 auto;
+      padding: 24px 20px 64px;
+    }
+
+    .topbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 28px;
+    }
+    .back-link {
+      font-size: 13px;
+      color: var(--muted);
+      letter-spacing: 0.5px;
+    }
+    .back-link:hover { color: var(--text); text-decoration: none; }
+    .net-badge {
+      font-size: 10px;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      padding: 4px 9px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      color: var(--muted);
+    }
+
+    h1 {
+      font-size: 28px;
+      font-weight: 800;
+      margin: 0 0 6px;
+      letter-spacing: -0.5px;
+    }
+    .lede {
+      color: var(--muted);
+      font-size: 14px;
+      margin: 0 0 28px;
+      max-width: 640px;
+      line-height: 1.55;
+    }
+
+    .total-pool {
+      background: linear-gradient(180deg, rgba(251,191,36,0.10), var(--surface-2));
+      border: 1px solid var(--gold-soft);
+      border-radius: 14px;
+      padding: 18px 20px 20px;
+      margin-bottom: 14px;
+      text-align: center;
+    }
+    .total-label {
+      font-size: 10px;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      opacity: 0.7;
+      margin-bottom: 6px;
+    }
+    .total-amount {
+      font-size: 38px;
+      font-weight: 800;
+      color: var(--gold);
+      font-variant-numeric: tabular-nums;
+      filter: drop-shadow(0 0 18px rgba(251,191,36,0.35));
+    }
+    .total-sub {
+      font-size: 11px;
+      color: var(--dim);
+      margin-top: 4px;
+    }
+    .pools {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 14px;
+      margin-bottom: 24px;
+    }
+    @media (min-width: 720px) {
+      .pools { grid-template-columns: repeat(4, 1fr); }
+    }
+    .ops {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 14px;
+      margin-bottom: 36px;
+    }
+    .ops-title {
+      font-size: 11px;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin: 0 0 10px;
+    }
+    .pool-card {
+      background: linear-gradient(180deg, var(--surface), var(--surface-2));
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 16px 16px 18px;
+    }
+    .pool-card.daily { border-color: var(--gold-soft); background: linear-gradient(180deg, rgba(251,191,36,0.06), var(--surface-2)); }
+    .pool-card.treasury { border-color: rgba(147,51,234,0.25); background: linear-gradient(180deg, rgba(147,51,234,0.05), var(--surface-2)); }
+    .pool-card.treasury .pool-amount { color: #c084fc; }
+    .pool-card.burn { border-color: rgba(239,68,68,0.25); background: linear-gradient(180deg, rgba(239,68,68,0.05), var(--surface-2)); }
+    .pool-card.burn .pool-amount { color: #f87171; }
+    .pool-label {
+      font-size: 10px;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      opacity: 0.55;
+      margin-bottom: 8px;
+    }
+    .pool-amount {
+      font-size: 24px;
+      font-weight: 800;
+      color: var(--gold);
+      font-variant-numeric: tabular-nums;
+    }
+    .pool-card.daily .pool-amount {
+      filter: drop-shadow(0 0 14px rgba(251,191,36,0.3));
+    }
+    .pool-sub {
+      font-size: 11px;
+      color: var(--dim);
+      margin-top: 6px;
+    }
+
+    .section {
+      background: linear-gradient(180deg, var(--surface), var(--surface-2));
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 18px 18px 20px;
+      margin-bottom: 18px;
+    }
+    .section-title {
+      font-size: 11px;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin: 0 0 14px;
+    }
+
+    .split-bar {
+      display: flex;
+      width: 100%;
+      height: 14px;
+      border-radius: 7px;
+      overflow: hidden;
+      margin-bottom: 16px;
+    }
+    .split-bar > div { height: 100%; }
+
+    .split-rows {
+      display: grid;
+      gap: 6px;
+    }
+    .split-row {
+      display: grid;
+      grid-template-columns: 14px 1fr auto;
+      align-items: center;
+      gap: 10px;
+      font-size: 13px;
+      padding: 6px 0;
+    }
+    .split-swatch { width: 12px; height: 12px; border-radius: 3px; }
+    .split-name { color: var(--text); }
+    .split-name small { color: var(--dim); margin-left: 6px; font-size: 11px; }
+    .split-pct { color: var(--gold); font-weight: 700; font-variant-numeric: tabular-nums; }
+
+    table.contribs {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+    table.contribs th, table.contribs td {
+      text-align: left;
+      padding: 10px 8px;
+      border-bottom: 1px solid var(--border);
+      vertical-align: middle;
+    }
+    table.contribs th {
+      font-size: 10px;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      color: var(--muted);
+      font-weight: 600;
+    }
+    table.contribs td.amount { color: var(--gold); font-variant-numeric: tabular-nums; font-weight: 600; }
+    table.contribs td.wallet { font-family: ui-monospace, Menlo, monospace; font-size: 12px; color: var(--text); }
+    table.contribs td.when { color: var(--muted); font-variant-numeric: tabular-nums; }
+    table.contribs tr:last-child td { border-bottom: none; }
+    .empty-state {
+      color: var(--muted);
+      font-size: 13px;
+      padding: 18px 0 6px;
+      text-align: center;
+    }
+
+    .footnote {
+      font-size: 11px;
+      color: var(--dim);
+      margin-top: 24px;
+      line-height: 1.6;
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <div class="topbar">
+      <a class="back-link" href="copper-beta.html">&#8249; Back to game</a>
+      <span class="net-badge" id="net-badge">DEVNET</span>
+    </div>
+
+    <h1>Prize Pool</h1>
+    <p class="lede">
+      Every paid run contributes 0.01 SOL. Each entry is split across daily, weekly,
+      and monthly leaderboards plus a lifetime jackpot. The four pool cards and the
+      total below are read live from the on-chain vault PDAs of the Copper Rush
+      Anchor program.
+    </p>
+
+    <div class="total-pool">
+      <div class="total-label">Total Prize Pool · on-chain</div>
+      <div class="total-amount" id="pool-total">— SOL</div>
+      <div class="total-sub" id="sub-total">sum of 4 vault PDAs</div>
+    </div>
+
+    <div class="pools">
+      <div class="pool-card daily">
+        <div class="pool-label">Today's Daily</div>
+        <div class="pool-amount" id="pool-daily">— SOL</div>
+        <div class="pool-sub" id="sub-daily">since 00:00 local</div>
+      </div>
+      <div class="pool-card">
+        <div class="pool-label">This Week</div>
+        <div class="pool-amount" id="pool-weekly">— SOL</div>
+        <div class="pool-sub" id="sub-weekly">since Monday</div>
+      </div>
+      <div class="pool-card">
+        <div class="pool-label">This Month</div>
+        <div class="pool-amount" id="pool-monthly">— SOL</div>
+        <div class="pool-sub" id="sub-monthly">since day 1</div>
+      </div>
+      <div class="pool-card">
+        <div class="pool-label">Jackpot</div>
+        <div class="pool-amount" id="pool-jackpot">— SOL</div>
+        <div class="pool-sub">lifetime, all entries</div>
+      </div>
+    </div>
+
+    <div class="ops-title">Treasury &amp; Burn wallet</div>
+    <div class="ops">
+      <div class="pool-card treasury">
+        <div class="pool-label">Treasury</div>
+        <div class="pool-amount" id="pool-treasury">— SOL</div>
+        <div class="pool-sub">lifetime accumulated</div>
+      </div>
+      <div class="pool-card burn">
+        <div class="pool-label">Burned tokens</div>
+        <div class="pool-amount" id="pool-burn">— SOL</div>
+        <div class="pool-sub">lifetime accumulated</div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">How each 0.01 SOL is split</div>
+      <div class="split-bar" id="split-bar"></div>
+      <div class="split-rows" id="split-rows"></div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">Recent contributors</div>
+      <div id="contribs-wrap">
+        <div class="empty-state">Loading…</div>
+      </div>
+    </div>
+
+    <p class="footnote">
+      Pool amounts and contributors refresh every 30 seconds. Daily resets at local
+      midnight; weekly resets Monday 00:00; monthly resets the 1st. Jackpot
+      accumulates across the lifetime of the project until paid out.
+    </p>
+  </div>
+
+  <script>
+  (function () {
+    "use strict";
+
+    const SUPABASE_URL = "https://dfcccaxcamnsyaevyhqz.supabase.co";
+    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRmY2NjYXhjYW1uc3lhZXZ5aHF6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE2ODEwNDUsImV4cCI6MjA4NzI1NzA0NX0.EpY4OfmLXWlIfnvS8bmqlNmcqpFLsYQ4fHRHK7HjKRc";
+    const SOLANA_NETWORK = "devnet";
+    const SOLANA_RPC_URL = SOLANA_NETWORK === "devnet"
+      ? "https://api.devnet.solana.com"
+      : "https://api.mainnet-beta.solana.com";
+
+    // Mirrors copper-beta.html so both pages point at the same program / vaults.
+    const COPPER_PROGRAM_ID    = "3e8EsKpaRaHevRLyPdWW73NELqHC1keBD6ZMVrbV2rUF";
+    const POOL_DAILY = 0, POOL_WEEKLY = 1, POOL_MONTHLY = 2, POOL_JACKPOT = 3;
+    const VAULT_RENT_LAMPORTS  = 890880; // init_pool funds each vault with this for rent-exemption
+
+    document.getElementById("net-badge").textContent = SOLANA_NETWORK.toUpperCase();
+
+    // Compute the 4 vault PDAs once and cache. Returns null until web3.js loads.
+    let _copperPdas = null;
+    function getCopperPdas() {
+      if (_copperPdas) return _copperPdas;
+      if (!window.solanaWeb3) return null;
+      const { PublicKey } = solanaWeb3;
+      const programId = new PublicKey(COPPER_PROGRAM_ID);
+      const vaults = {};
+      for (const k of [POOL_DAILY, POOL_WEEKLY, POOL_MONTHLY, POOL_JACKPOT]) {
+        const [vault] = PublicKey.findProgramAddressSync(
+          [Buffer.from("vault"), Buffer.from([k])],
+          programId,
+        );
+        vaults[k] = vault;
+      }
+      _copperPdas = { programId, vaults };
+      return _copperPdas;
+    }
+
+    // Live on-chain vault balances. Returns { daily, weekly, monthly, jackpot, total }
+    // in SOL, or null on RPC / web3 unavailability. Never throws.
+    async function fetchVaultBalancesSol() {
+      const pdas = getCopperPdas();
+      if (!pdas) return null;
+      try {
+        const { Connection } = solanaWeb3;
+        const connection = new Connection(SOLANA_RPC_URL, "confirmed");
+        const kinds = [POOL_DAILY, POOL_WEEKLY, POOL_MONTHLY, POOL_JACKPOT];
+        const lamports = await Promise.all(
+          kinds.map((k) => connection.getBalance(pdas.vaults[k])),
+        );
+        const toSol = (l) => Math.max(0, l - VAULT_RENT_LAMPORTS) / 1e9;
+        const daily   = toSol(lamports[0]);
+        const weekly  = toSol(lamports[1]);
+        const monthly = toSol(lamports[2]);
+        const jackpot = toSol(lamports[3]);
+        return { daily, weekly, monthly, jackpot, total: daily + weekly + monthly + jackpot };
+      } catch (e) {
+        console.warn("[fetchVaultBalancesSol] RPC failed:", e);
+        return null;
+      }
+    }
+
+    function sbFetch(path) {
+      return fetch(SUPABASE_URL + "/rest/v1/" + path, {
+        headers: {
+          "apikey": SUPABASE_ANON_KEY,
+          "Authorization": "Bearer " + SUPABASE_ANON_KEY,
+        },
+      });
+    }
+
+    function todayStartISO() {
+      const d = new Date(); d.setHours(0, 0, 0, 0); return d.toISOString();
+    }
+    function weekStartISO() {
+      const d = new Date();
+      const day = d.getDay() || 7;
+      d.setDate(d.getDate() - (day - 1));
+      d.setHours(0, 0, 0, 0);
+      return d.toISOString();
+    }
+    function monthStartISO() {
+      const d = new Date(); d.setDate(1); d.setHours(0, 0, 0, 0); return d.toISOString();
+    }
+    function fmtSol(n) {
+      return (Number(n) || 0).toFixed(4) + " SOL";
+    }
+    function shortWallet(w) {
+      if (!w || w.length < 10) return w || "—";
+      return w.slice(0, 4) + "…" + w.slice(-4);
+    }
+    function timeAgo(iso) {
+      const ms = Date.now() - new Date(iso).getTime();
+      const s = Math.floor(ms / 1000);
+      if (s < 60) return s + "s ago";
+      const m = Math.floor(s / 60);
+      if (m < 60) return m + "m ago";
+      const h = Math.floor(m / 60);
+      if (h < 24) return h + "h ago";
+      const d = Math.floor(h / 24);
+      return d + "d ago";
+    }
+    function explorerTxUrl(sig) {
+      return "https://solscan.io/tx/" + sig + (SOLANA_NETWORK === "mainnet-beta" ? "" : "?cluster=" + SOLANA_NETWORK);
+    }
+
+    const SPLIT = [
+      { key: "daily",       label: "Daily leaderboard",   bps: 3500, color: "#fbbf24" },
+      { key: "weekly",      label: "Weekly leaderboard",  bps: 2500, color: "#f59e0b" },
+      { key: "monthly",     label: "Monthly leaderboard", bps:  500, color: "#d97706" },
+      { key: "jackpot",     label: "Jackpot",             bps:  500, color: "#10b981" },
+      { key: "treasury",    label: "Treasury",            bps: 2000, color: "#9333ea" },
+      { key: "dev",         label: "Dev",                 bps:  500, color: "#3b82f6" },
+      { key: "buybackBurn", label: "Buyback & burn",      bps:  500, color: "#ef4444" },
+    ];
+
+    function renderSplit() {
+      const bar = document.getElementById("split-bar");
+      const rows = document.getElementById("split-rows");
+      bar.innerHTML = "";
+      rows.innerHTML = "";
+      for (const s of SPLIT) {
+        const seg = document.createElement("div");
+        seg.style.flex = String(s.bps);
+        seg.style.background = s.color;
+        seg.title = s.label + " — " + (s.bps / 100) + "%";
+        bar.appendChild(seg);
+
+        const row = document.createElement("div");
+        row.className = "split-row";
+        row.innerHTML =
+          '<span class="split-swatch" style="background:' + s.color + '"></span>' +
+          '<span class="split-name">' + s.label + ' <small>0.01 SOL × ' + (s.bps / 100) + '%</small></span>' +
+          '<span class="split-pct">' + (s.bps / 100).toFixed(0) + '%</span>';
+        rows.appendChild(row);
+      }
+    }
+
+    async function loadPools() {
+      // Source of truth for the 4 leaderboard pools = on-chain vault PDA
+      // balances. Treasury / burn / today's run counter still come from
+      // Supabase (out of scope for this refactor, and Supabase tracks
+      // lifetime totals that on-chain wallets do not separate cleanly).
+      const dash = "— SOL";
+      const poolsPromise   = fetchVaultBalancesSol();
+      const sbDailyPromise = sbFetch("fee_allocations?select=entry_fee_sol,wallet&created_at=gte." + encodeURIComponent(todayStartISO())).then(r => r.json()).catch(() => null);
+      const sbOpsPromise   = sbFetch("fee_allocations?select=treasury_sol,buyback_burn_sol").then(r => r.json()).catch(() => null);
+      const [pools, sbDaily, sbOps] = await Promise.all([poolsPromise, sbDailyPromise, sbOpsPromise]);
+
+      const sumKey = (rows, k) => Array.isArray(rows) ? rows.reduce((a, r) => a + (Number(r[k]) || 0), 0) : 0;
+
+      // --- 4 pools + total (on-chain) -------------------------------------
+      document.getElementById("pool-daily").textContent   = pools ? fmtSol(pools.daily)   : dash;
+      document.getElementById("pool-weekly").textContent  = pools ? fmtSol(pools.weekly)  : dash;
+      document.getElementById("pool-monthly").textContent = pools ? fmtSol(pools.monthly) : dash;
+      document.getElementById("pool-jackpot").textContent = pools ? fmtSol(pools.jackpot) : dash;
+      document.getElementById("pool-total").textContent   = pools ? fmtSol(pools.total)   : dash;
+      document.getElementById("sub-total").textContent    = pools
+        ? "sum of 4 vault PDAs · live from " + SOLANA_NETWORK
+        : "RPC unreachable — try again in 30s";
+
+      // --- treasury + burn (Supabase lifetime totals, unchanged) ----------
+      document.getElementById("pool-treasury").textContent = fmtSol(sumKey(sbOps, "treasury_sol"));
+      document.getElementById("pool-burn").textContent     = fmtSol(sumKey(sbOps, "buyback_burn_sol"));
+
+      // --- today's run / player counter (Supabase) ------------------------
+      const runsToday   = Array.isArray(sbDaily) ? sbDaily.length : 0;
+      const uniqueToday = Array.isArray(sbDaily) ? new Set(sbDaily.map(r => r.wallet)).size : 0;
+      document.getElementById("sub-daily").textContent =
+        runsToday > 0 ? runsToday + " run" + (runsToday !== 1 ? "s" : "") + " · " + uniqueToday + " player" + (uniqueToday !== 1 ? "s" : "") : "no entries yet today";
+    }
+
+    async function loadContribs() {
+      const wrap = document.getElementById("contribs-wrap");
+      try {
+        const res = await sbFetch("fee_allocations?select=wallet,entry_fee_sol,tx_signature,created_at&order=created_at.desc&limit=10");
+        const rows = await res.json();
+        if (!Array.isArray(rows) || rows.length === 0) {
+          wrap.innerHTML = '<div class="empty-state">No paid runs yet. Be the first.</div>';
+          return;
+        }
+        let html = '<table class="contribs"><thead><tr><th>Wallet</th><th>Amount</th><th>When</th><th></th></tr></thead><tbody>';
+        for (const r of rows) {
+          html += '<tr>' +
+            '<td class="wallet">' + shortWallet(r.wallet) + '</td>' +
+            '<td class="amount">' + fmtSol(r.entry_fee_sol) + '</td>' +
+            '<td class="when">' + timeAgo(r.created_at) + '</td>' +
+            '<td><a href="' + explorerTxUrl(r.tx_signature) + '" target="_blank" rel="noopener">tx ↗</a></td>' +
+            '</tr>';
+        }
+        html += '</tbody></table>';
+        wrap.innerHTML = html;
+      } catch (e) {
+        wrap.innerHTML = '<div class="empty-state">Could not load contributors.</div>';
+      }
+    }
+
+    function refresh() {
+      loadPools();
+      loadContribs();
+    }
+
+    renderSplit();
+    refresh();
+    setInterval(refresh, 30000);
+  })();
+  </script>
+</body>
+</html>
