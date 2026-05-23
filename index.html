@@ -1106,6 +1106,14 @@ button:disabled { opacity: .5; cursor: not-allowed; }
       50%      { box-shadow: 0 0 32px rgba(255,200,60,0.65), 0 4px 14px rgba(0,0,0,0.5); }
     }
 
+    /* Desktop guard — JS toggles inline display on mobile HUD/controls when a
+       run starts; without this rule those inline styles also activate on
+       desktop and overlap the canvas. Keep mobile elements hidden anywhere
+       wider than the mobile breakpoint, regardless of JS. */
+    @media (min-width: 901px) {
+      #mobile-hud, #mobile-pu, #mobile-time-bar { display: none !important; }
+    }
+
     /* Mobile media query — portrait OR landscape, anything ≤ 900px wide.
        Hides desktop side panels and resizes canvas so the controls
        overlaid at the bottom never crop the play area. */
