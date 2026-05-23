@@ -38,7 +38,7 @@ OPS = {
 now = int(time.time())
 print(f"current Unix time: {now}\n")
 print("=== VaultStates ===")
-# VaultState layout: 8 disc + 1 pool_kind + 1 bump + 1 vault_bump + 8 epoch_zero(i64) + 8 period_duration_seconds(u64)
+# VaultState layout: 8 disc + 1 pool_kind + 1 bump + 1 vault_bump + 8 epoch_zero(i64) + 4 period_duration_seconds(u32)
 #   + 8 open_period_id(u64) + 8 open_period_collected(u64) + 8 awaiting_settlement_total + 8 obligations_lamports
 #   + 8 total_collected_lifetime + 8 total_paid_lifetime + 8 last_seal_at(i64) + 8 last_settlement_at(i64) + 64 reserved
 for name, pk in VAULT_STATES.items():
@@ -49,7 +49,7 @@ for name, pk in VAULT_STATES.items():
     bump = raw[off]; off += 1
     vault_bump = raw[off]; off += 1
     epoch_zero = int.from_bytes(raw[off:off+8], "little", signed=True); off += 8
-    period_dur = int.from_bytes(raw[off:off+8], "little"); off += 8
+    period_dur = int.from_bytes(raw[off:off+4], "little"); off += 4
     open_pid = int.from_bytes(raw[off:off+8], "little"); off += 8
     open_coll = int.from_bytes(raw[off:off+8], "little"); off += 8
     awaiting = int.from_bytes(raw[off:off+8], "little"); off += 8

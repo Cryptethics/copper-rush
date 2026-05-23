@@ -5149,7 +5149,10 @@ button:disabled { opacity: .5; cursor: not-allowed; }
   const BURN_PUBKEY       = "Euarr1Pu3LMPWgZRcwUYEcjwfE6FzJ5W5wsN8Wm6AD39";
   // From IDL (target/idl/copper_rush_anchor.json) — Anchor sighash for "pay_entry".
   const PAY_ENTRY_DISCRIMINATOR = new Uint8Array([187, 10, 90, 67, 83, 172, 196, 207]);
+  // sha256("global:seal_period").slice(0,8) — Anchor sighash for "seal_period".
+  const SEAL_PERIOD_DISCRIMINATOR = new Uint8Array([57, 58, 43, 157, 104, 77, 163, 91]);
   const POOL_DAILY = 0, POOL_WEEKLY = 1, POOL_MONTHLY = 2, POOL_JACKPOT = 3;
+  const AUTO_ROTATE_POOL_KINDS = [POOL_DAILY, POOL_WEEKLY, POOL_MONTHLY];
 
   // Cached PDAs (computed once on first paid action).
   let _copperPdas = null;
@@ -5185,9 +5188,112 @@ button:disabled { opacity: .5; cursor: not-allowed; }
       case 6306:
       case 6307: return "On-chain config mismatch (operator wallet drifted). Please refresh.";
       case 6308: return "Vault state mismatch. Please refresh.";
-      case 6309: return "A reward period has expired and must be sealed by admin before next paid runs.";
+      case 6309: return "A reward period has expired. Refresh and try again.";
       default:   return fallbackMsg || "Transaction failed. Please try again.";
     }
+  }
+
+  // Extract Anchor "Error Number: NNNN" from preflight logs / message.
+  function parseAnchorErrorCode(err) {
+    if (!err) return null;
+    const candidates = [];
+    if (Array.isArray(err.logs)) candidates.push(err.logs.join("\n"));
+    if (typeof err.message === "string") candidates.push(err.message);
+    if (typeof err.simErr === "string") candidates.push(err.simErr);
+    for (const text of candidates) {
+      const m = text.match(/Error Number:\s*(\d+)/);
+      if (m) return parseInt(m[1], 10);
+    }
+    return null;
+  }
+
+  // Read just the 3 fields of VaultState needed to decide expiry.
+  // Layout (Borsh, no padding): 8 disc + 1 pool_kind + 1 bump + 1 vault_bump
+  //   + 8 epoch_zero(i64) + 4 period_duration_seconds(u32) + 8 open_period_id(u64) + ...
+  async function readVaultStateOpenPeriod(connection, vaultStatePubkey) {
+    const accInfo = await connection.getAccountInfo(vaultStatePubkey, "confirmed");
+    if (!accInfo || !accInfo.data) return null;
+    const data = accInfo.data;
+    if (data.byteLength < 31) return null;
+    const dv = new DataView(data.buffer, data.byteOffset, data.byteLength);
+    const epochZero              = dv.getBigInt64(11, true);
+    const periodDurationSeconds  = dv.getUint32(19, true);
+    const openPeriodId           = dv.getBigUint64(23, true);
+    return { epochZero, periodDurationSeconds, openPeriodId };
+  }
+
+  function isAutoRotatePeriodExpired(state) {
+    if (!state) return false;
+    if (state.periodDurationSeconds === 0) return false; // manual rotation (jackpot)
+    const nowSec = BigInt(Math.floor(Date.now() / 1000));
+    if (nowSec < state.epochZero) return false;
+    const currentPeriodId = (nowSec - state.epochZero) / BigInt(state.periodDurationSeconds);
+    return state.openPeriodId < currentPeriodId;
+  }
+
+  // Build a single permissionless seal_period instruction.
+  // Args layout: disc(8) | pool_kind(u8) | expected_open_period_id(u64 LE) = 17 bytes
+  function buildSealPeriodIx({ programId, caller, poolKind, openPeriodId }) {
+    const { PublicKey, TransactionInstruction, SystemProgram } = solanaWeb3;
+    const seedPending     = Buffer.from("pending");
+    const seedVaultState  = Buffer.from("vault_state");
+    const poolKindByte    = Buffer.from([poolKind]);
+    const periodIdLE      = new Uint8Array(8);
+    let v = openPeriodId;
+    for (let i = 0; i < 8; i++) { periodIdLE[i] = Number(v & 0xffn); v >>= 8n; }
+    const [vaultStatePda] = PublicKey.findProgramAddressSync(
+      [seedVaultState, poolKindByte],
+      programId
+    );
+    const [pendingPda] = PublicKey.findProgramAddressSync(
+      [seedPending, poolKindByte, Buffer.from(periodIdLE)],
+      programId
+    );
+    const ixData = Buffer.concat([
+      Buffer.from(SEAL_PERIOD_DISCRIMINATOR),
+      poolKindByte,
+      Buffer.from(periodIdLE),
+    ]);
+    const keys = [
+      { pubkey: caller,                  isSigner: true,  isWritable: true  },
+      { pubkey: vaultStatePda,           isSigner: false, isWritable: true  },
+      { pubkey: pendingPda,              isSigner: false, isWritable: true  },
+      { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
+    ];
+    return new TransactionInstruction({ programId, keys, data: ixData });
+  }
+
+  // Permissionless self-heal: seal any expired auto-rotate pool (daily/weekly/monthly).
+  // Jackpot is admin-only (advance_jackpot_round) and is never touched here.
+  // Returns true iff at least one seal_period ix was submitted and confirmed.
+  async function sealExpiredAutoRotatePools(connection, callerPubkey) {
+    const { Transaction } = solanaWeb3;
+    const { programId, pools } = getCopperPdas();
+    const ixs = [];
+    const sealedKinds = [];
+    for (const poolKind of AUTO_ROTATE_POOL_KINDS) {
+      const vs = pools[poolKind].vaultState;
+      const state = await readVaultStateOpenPeriod(connection, vs);
+      if (!isAutoRotatePeriodExpired(state)) continue;
+      ixs.push(buildSealPeriodIx({
+        programId,
+        caller: callerPubkey,
+        poolKind,
+        openPeriodId: state.openPeriodId,
+      }));
+      sealedKinds.push(poolKind);
+    }
+    if (ixs.length === 0) return false;
+    const tx = new Transaction();
+    for (const ix of ixs) tx.add(ix);
+    const { blockhash } = await connection.getLatestBlockhash();
+    tx.recentBlockhash = blockhash;
+    tx.feePayer = callerPubkey;
+    console.log("[autoSeal] sealing pool_kinds:", sealedKinds);
+    const { signature } = await window.solana.signAndSendTransaction(tx);
+    await connection.confirmTransaction(signature, "confirmed");
+    console.log("[autoSeal] sealed", ixs.length, "pool(s); sig:", signature);
+    return true;
   }
 
   // ----------------------------
@@ -5354,7 +5460,7 @@ button:disabled { opacity: .5; cursor: not-allowed; }
     setPayStatus("");
   }
 
-  async function payForRun() {
+  async function payForRun(_isSealRetry) {
     if (!payEnabled()) return null; // free mode — skip payment
 
     if (!walletPublicKey) {
@@ -5488,6 +5594,25 @@ button:disabled { opacity: .5; cursor: not-allowed; }
       if (err.code === 4001 || err.message?.includes("rejected")) {
         showPayError("Transaction rejected. Run cancelled.");
       } else {
+        const anchorCode = parseAnchorErrorCode(err);
+        if (anchorCode === 6309 && !_isSealRetry) {
+          try {
+            if (payError) payError.style.display = "none";
+            if (payRetryBtn) payRetryBtn.style.display = "none";
+            if (payCancelBtn) payCancelBtn.style.display = "none";
+            showPaySpinner(true);
+            setPayStatus("Refreshing expired reward periods...");
+            const sealConn   = new Connection(SOLANA_RPC_URL, "confirmed");
+            const sealCaller = new PublicKey(walletPublicKey);
+            const sealed = await sealExpiredAutoRotatePools(sealConn, sealCaller);
+            if (sealed) {
+              return await payForRun(true);
+            }
+          } catch (sealErr) {
+            console.error("[payForRun] auto-seal-and-retry failed:", sealErr);
+            // fall through to normal error display below
+          }
+        }
         const friendly = mapAnchorPayError(err.logs, err.message);
         showPayError(friendly);
       }
