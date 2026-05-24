@@ -1726,18 +1726,25 @@ button:disabled { opacity: .5; cursor: not-allowed; }
   };
 
   // ----------------------------
-  // Player progress (paid mode runCount per wallet)
+  // Player progress (paid mode all-time stats per wallet)
   // ----------------------------
+  // Persists across origins, browsers, and devices. localStorage stays as an
+  // offline shadow; on wallet connect we merge with max() so neither side
+  // ever loses data when a player straddles copper-rush.com + localhost.
   const ProgressAPI = {
     async get(wallet) {
-      if (!supabaseEnabled() || !wallet) return 0;
+      if (!supabaseEnabled() || !wallet) return { runCount: 0, allTimeCopper: 0 };
       try {
-        const res = await sbFetch(`player_progress?wallet=eq.${encodeURIComponent(wallet)}&select=run_count`);
+        const res  = await sbFetch(`player_progress?wallet=eq.${encodeURIComponent(wallet)}&select=run_count,all_time_copper`);
         const rows = await res.json();
-        return Array.isArray(rows) && rows[0] ? Number(rows[0].run_count) || 0 : 0;
-      } catch { return 0; }
+        const r    = Array.isArray(rows) && rows[0] ? rows[0] : null;
+        return {
+          runCount:      r ? Number(r.run_count)       || 0 : 0,
+          allTimeCopper: r ? Number(r.all_time_copper) || 0 : 0,
+        };
+      } catch { return { runCount: 0, allTimeCopper: 0 }; }
     },
-    async set(wallet, runCount) {
+    async set(wallet, { runCount, allTimeCopper }) {
       if (!supabaseEnabled() || !wallet) return;
       try {
         await sbFetch("player_progress", {
@@ -1745,8 +1752,9 @@ button:disabled { opacity: .5; cursor: not-allowed; }
           prefer: "resolution=merge-duplicates,return=minimal",
           body: JSON.stringify({
             wallet,
-            run_count: runCount,
-            updated_at: new Date().toISOString(),
+            run_count:       runCount,
+            all_time_copper: allTimeCopper,
+            updated_at:      new Date().toISOString(),
           }),
         });
       } catch {}
@@ -2897,8 +2905,8 @@ button:disabled { opacity: .5; cursor: not-allowed; }
       playerSpawn = CORNER_ROTATION[cornerIdx].player;
       ghostSpawn  = CORNER_ROTATION[cornerIdx].ghost;
       runCount++;
-      // Persist progress so the player resumes on the same map/corner next session
-      if (walletPublicKey) ProgressAPI.set(walletPublicKey, runCount);
+      // Note: Supabase UPSERT of run_count + all_time_copper happens at run end
+      // (see the all-time tracking block) so we only persist completed runs.
     }
     elMapName.textContent = map.name;
     grid = map.grid;
@@ -3678,6 +3686,14 @@ button:disabled { opacity: .5; cursor: not-allowed; }
       }
       saveState();
       updateAllTimeUI();
+      // Mirror to Supabase per-wallet so totals survive cache clear / origin
+      // switch / new device. Free mode never reaches here.
+      if (walletPublicKey) {
+        ProgressAPI.set(walletPublicKey, {
+          runCount:      persist.allTimeRuns,
+          allTimeCopper: persist.allTimeCopper,
+        });
+      }
     }
 
     if (died) {
@@ -5001,12 +5017,27 @@ button:disabled { opacity: .5; cursor: not-allowed; }
 
     // Check for existing username claim + load map/corner progress
     setNicknameStatus("Checking nickname...", "info");
-    const [existing, savedRunCount] = await Promise.all([
+    const [existing, savedProgress] = await Promise.all([
       UsernameAPI.getForWallet(walletPublicKey),
       ProgressAPI.get(walletPublicKey),
     ]);
     if (walletPublicKey !== publicKey.toString()) return; // disconnected mid-check
-    runCount = savedRunCount;
+
+    // Merge remote (Supabase) with local (localStorage shadow) using max() so
+    // a player who toggles between copper-rush.com and localhost never loses
+    // their all-time totals. Push merged values back if local was ahead.
+    const localRuns   = Number(persist.allTimeRuns)   || 0;
+    const localCopper = Number(persist.allTimeCopper) || 0;
+    const mergedRuns   = Math.max(savedProgress.runCount,      localRuns);
+    const mergedCopper = Math.max(savedProgress.allTimeCopper, localCopper);
+    runCount              = mergedRuns;
+    persist.allTimeRuns   = mergedRuns;
+    persist.allTimeCopper = mergedCopper;
+    saveState();
+    updateAllTimeUI();
+    if (mergedRuns > savedProgress.runCount || mergedCopper > savedProgress.allTimeCopper) {
+      ProgressAPI.set(walletPublicKey, { runCount: mergedRuns, allTimeCopper: mergedCopper });
+    }
     if (existing) {
       claimedNickname = existing;
       lockNicknameInput(existing);
