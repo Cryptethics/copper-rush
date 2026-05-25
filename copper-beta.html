@@ -759,6 +759,7 @@ button:disabled { opacity: .5; cursor: not-allowed; }
     body.free-mode #endWeeklyDetails {
       display: none !important;
     }
+    /* launch-simple: paid endscreen shows only Submit Score; free endscreen shows only Play Again as exit/restart path. */
     body:not(.free-mode) #btnPlayAgain { display: none !important; }
     #btnPlayAgain {
       flex: 1;
@@ -1287,8 +1288,8 @@ button:disabled { opacity: .5; cursor: not-allowed; }
       </div>
 
       <div class="play-buttons">
-        <button id="btnPlayFree">&#9654; Play Free Demo</button>
         <button id="btnPlayPaid" disabled>&#127942; Compete for 0.01 SOL</button>
+        <button id="btnPlayFree">&#9654; Play Free Demo</button>
       </div>
 
       <div style="margin-top:20px; font-size:10px; opacity:0.2; letter-spacing:1px;">
@@ -1373,7 +1374,7 @@ button:disabled { opacity: .5; cursor: not-allowed; }
           <span class="k">Today's best</span>
           <span class="v mono" id="lbToday" style="color:#7ee787;">-</span>
         </div>
-        <div class="row">
+        <div class="row" style="display:none;">
           <span class="k">This week</span>
           <span class="v mono" id="lbWeek" style="color:#7ee787;">-</span>
         </div>
@@ -1396,28 +1397,31 @@ button:disabled { opacity: .5; cursor: not-allowed; }
           <span class="k">Daily Score</span>
           <span class="stat-big mono" id="dlScore" style="color:#7ee787;">0</span>
         </div>
+        <div style="font-size:11px; color:#9aa3b2; padding:2px 0 4px; line-height:1.4;">
+          Daily score = best 3 runs + consistency bonus (+10% from extra runs, capped at +30%).
+        </div>
         <div id="dlDetails" class="collapsed">
+          <div class="row">
+            <span class="k">To top 40%</span>
+            <span class="v mono" id="dlToTop" style="color:#ffcc66;">-</span>
+          </div>
           <div class="row">
             <span class="k">Best 3 Sum</span>
             <span class="v mono" id="dlBest3">0</span>
           </div>
           <div class="row">
-            <span class="k">Volume Bonus</span>
+            <span class="k">Consistency Bonus</span>
             <span class="v mono" id="dlVolume">+0</span>
           </div>
           <div class="row">
-            <span class="k">Runs counted</span>
-            <span class="v mono" id="dlRuns">0 / 18</span>
-          </div>
-          <div class="row">
-            <span class="k">To top 25%</span>
-            <span class="v mono" id="dlToTop" style="color:#ffcc66;">-</span>
+            <span class="k">Runs today</span>
+            <span class="v mono" id="dlRuns">0</span>
           </div>
         </div>
       </div>
 
-      <!-- Weekly Leaderboard -->
-      <div class="panel-section mode-paid" style="margin-top:8px;">
+      <!-- Weekly Leaderboard — hidden in launch-simple; DOM kept so JS writes are no-ops -->
+      <div class="panel-section mode-paid" style="margin-top:8px;display:none;">
         <div class="section-title" style="cursor:pointer;display:flex;justify-content:space-between;align-items:center;" onclick="document.getElementById('wlDetails').classList.toggle('collapsed');this.querySelector('.dd-arrow').classList.toggle('open');">
           Weekly Leaderboard <span class="dd-arrow">&#9654;</span>
         </div>
@@ -1463,14 +1467,14 @@ button:disabled { opacity: .5; cursor: not-allowed; }
       <div class="panel-section mode-paid" style="margin-top:8px;">
         <div class="section-title">Prize Pool</div>
         <div class="pp-panel-row">
-          <span class="k">&#127942; Today (daily)</span>
+          <span class="k">&#127942; Daily Pool</span>
           <span class="pp-panel-amount" id="panelPP">0.00 SOL</span>
         </div>
-        <div class="pp-panel-row">
+        <div class="pp-panel-row" style="display:none;">
           <span class="k">Weekly pool</span>
           <span class="v mono" id="panelWeekly">0.000 SOL</span>
         </div>
-        <div class="pp-panel-row">
+        <div class="pp-panel-row" style="display:none;">
           <span class="k">Monthly pool</span>
           <span class="v mono" id="panelMonthly">0.000 SOL</span>
         </div>
@@ -1478,7 +1482,7 @@ button:disabled { opacity: .5; cursor: not-allowed; }
           <span class="k">Jackpot</span>
           <span class="v mono" id="panelJackpot">0.000 SOL</span>
         </div>
-        <div class="pp-panel-row">
+        <div class="pp-panel-row" style="display:none;">
           <span class="k">Total prize pool</span>
           <span class="v mono" id="panelTotal">0.000 SOL</span>
         </div>
@@ -1487,7 +1491,7 @@ button:disabled { opacity: .5; cursor: not-allowed; }
           <span class="v mono" id="panelRuns">0</span>
         </div>
         <div class="pp-panel-row">
-          <span class="k">Winners (top 20%)</span>
+          <span class="k">Top 40% win</span>
           <span class="v mono" id="panelWinners">-</span>
         </div>
       </div>
@@ -1537,15 +1541,15 @@ button:disabled { opacity: .5; cursor: not-allowed; }
           <span class="end-stat-label">&#9874; Copper collected</span>
           <span class="end-stat-value copper-color mono" id="endCopper">0</span>
         </div>
-        <div class="end-stat-row">
+        <div class="end-stat-row mode-paid">
           <span class="end-stat-label">&#9888; Risk copper</span>
           <span class="end-stat-value mono" id="endRiskCopper" style="color:#ff6644;">0</span>
         </div>
-        <div class="end-stat-row">
+        <div class="end-stat-row mode-paid">
           <span class="end-stat-label">&#128142; Diamonds</span>
           <span class="end-stat-value diamond-color mono" id="endDiam">-</span>
         </div>
-        <div class="end-stat-row" id="endComboRow" style="display:none;">
+        <div class="end-stat-row mode-paid" id="endComboRow" style="display:none;">
           <span class="end-stat-label">Combo multiplier</span>
           <span class="end-stat-value mono" id="endCombo" style="color:#ff6;">1.0x</span>
         </div>
@@ -1554,25 +1558,25 @@ button:disabled { opacity: .5; cursor: not-allowed; }
           <span class="end-stat-value mono" id="endTime">30.0s</span>
         </div>
 
-        <div class="end-highlight">
+        <div class="end-highlight mode-paid">
           <div class="end-highlight-label">Leaderboard Score</div>
           <div class="end-highlight-value mono" id="endScore">0</div>
         </div>
 
-        <div class="end-stat-row">
+        <div class="end-stat-row" style="display:none;">
           <span class="end-stat-label">&#128176; Redeem (coins)</span>
           <span class="end-stat-value coin-color mono" id="endPay">0</span>
         </div>
 
-        <div class="end-warn" id="endWarn">Submit to Leaderboard or Redeem for coins.</div>
+        <div class="end-warn mode-paid" id="endWarn" style="display:none;">Submit to Leaderboard or Redeem for coins.</div>
 
-        <button class="btn-share" id="btnShare">&#128203; Copy Score to Clipboard</button>
+        <button class="btn-share mode-paid" id="btnShare">&#128203; Copy Score to Clipboard</button>
 
-        <!-- Weekly Progress dropdown -->
-        <div class="end-weekly-toggle" onclick="document.getElementById('endWeeklyDetails').classList.toggle('collapsed');this.querySelector('.dd-arrow').classList.toggle('open');">
+        <!-- Weekly Progress dropdown — hidden in launch-simple; DOM kept so JS writes are no-ops -->
+        <div class="end-weekly-toggle" style="display:none;" onclick="document.getElementById('endWeeklyDetails').classList.toggle('collapsed');this.querySelector('.dd-arrow').classList.toggle('open');">
           <span class="dd-arrow">&#9654;</span> Weekly Stats
         </div>
-        <div id="endWeeklyDetails" class="collapsed">
+        <div id="endWeeklyDetails" class="collapsed" style="display:none;">
           <div class="end-stat-row">
             <span class="end-stat-label">Weekly Score</span>
             <span class="end-stat-value mono" id="endWeeklyScore" style="color:#a8d4ff;">0</span>
@@ -1602,7 +1606,7 @@ button:disabled { opacity: .5; cursor: not-allowed; }
       <div class="end-submit-as">Submitting as: <strong id="endNickname">Anonymous</strong></div>
       <div class="end-actions">
         <button class="btn-lb" id="btnLB">&#127942; Submit Score</button>
-        <button class="btn-redeem" id="btnRedeem" disabled>&#128176; Redeem Coins</button>
+        <button class="btn-redeem" id="btnRedeem" disabled style="display:none;">&#128176; Redeem Coins</button>
         <button id="btnPlayAgain">&#9654; Play Again</button>
       </div>
     </div>
@@ -1876,24 +1880,28 @@ button:disabled { opacity: .5; cursor: not-allowed; }
   }
 
   // ----------------------------
-  // Daily Score formula
+  // Daily Score formula (launch-simple)
   // ----------------------------
-  // DAILY SCORE = Best3Sum + VolumeBonus
-  //   Best3Sum    = sum of top 3 run scores today
-  //   VolumeBonus = min(0.10 × sum(next best 15 runs), 0.30 × Best3Sum)
-  //   Final score = round(result)
+  // DAILY SCORE = Best3Sum + ConsistencyBonus
+  //   Best3Sum         = sum of top 3 run scores today (slice(0,3) — top 3 only)
+  //   ConsistencyBonus = min(0.10 × sum(runs AFTER top 3), 0.30 × Best3Sum)
+  //                      slice(3) is disjoint from best3, so no double-count.
+  //                      With ≤3 runs, sorted.slice(3) is [] → bonus = 0.
+  //   Final score      = round(result), sorted descending in leaderboard.
+  // Internal field `volumeBonus` is kept as-is to avoid breaking downstream
+  // refs; UI labels say "Consistency Bonus".
   function computeDailyScore(runScores) {
     const sorted = runScores.slice().sort((a, b) => b - a);
     const best3 = sorted.slice(0, 3);
     const best3Sum = best3.reduce((s, v) => s + v, 0);
-    const next15 = sorted.slice(3, 18);
-    const next15Sum = next15.reduce((s, v) => s + v, 0);
-    const volumeBonus = Math.min(0.10 * next15Sum, 0.30 * best3Sum);
+    const extraRuns = sorted.slice(3);
+    const extraSum = extraRuns.reduce((s, v) => s + v, 0);
+    const volumeBonus = Math.min(0.10 * extraSum, 0.30 * best3Sum);
     return {
       dailyScore: Math.round(best3Sum + volumeBonus),
       best3Sum,
       volumeBonus: Math.round(volumeBonus),
-      runsUsed: Math.min(sorted.length, 18),
+      runsUsed: sorted.length,
       totalRuns: sorted.length,
     };
   }
@@ -3556,7 +3564,7 @@ button:disabled { opacity: .5; cursor: not-allowed; }
     elDLScore.textContent  = String(stats.dailyScore);
     elDLBest3.textContent  = String(stats.best3Sum);
     elDLVolume.textContent = "+" + String(stats.volumeBonus);
-    elDLRuns.textContent   = stats.runsUsed + " / 18 (" + stats.totalRuns + " total)";
+    elDLRuns.textContent   = String(stats.totalRuns);
 
     // Update lbDailyBest for endRun "new personal best" check
     const tk = todayKey();
@@ -3565,7 +3573,7 @@ button:disabled { opacity: .5; cursor: not-allowed; }
       .map(e => e.score);
     lbDailyBest = myRuns.length ? Math.max(...myRuns) : 0;
 
-    // Global daily leaderboard — top 25% cutoff (async)
+    // Global daily leaderboard — top 40% cutoff (launch-simple payout zone, async)
     try {
       const lb = await LeaderboardAPI.getDailyLeaderboard();
       const total = lb.length;
@@ -3573,11 +3581,11 @@ button:disabled { opacity: .5; cursor: not-allowed; }
         elDLToTop.textContent = "-";
         elDLToTop.style.color = "#ffcc66";
       } else {
-        const cutoffIdx = Math.max(0, Math.ceil(total * 0.25) - 1);
+        const cutoffIdx = Math.max(0, Math.ceil(total * 0.40) - 1);
         const cutoffScore = lb[cutoffIdx]?.dailyScore || 0;
         const diff = cutoffScore - stats.dailyScore;
         if (diff <= 0) {
-          elDLToTop.textContent = "\u2713 Top 25%";
+          elDLToTop.textContent = "\u2713 Top 40%";
           elDLToTop.style.color = "#7ee787";
         } else {
           elDLToTop.textContent = "+" + diff + " pts";
@@ -3877,6 +3885,7 @@ button:disabled { opacity: .5; cursor: not-allowed; }
     endPay.textContent = String(redeem.payoutCoins);
 
     btnLB.onclick = async () => {
+      if (gameMode === "free") return; // defense-in-depth: free runs never submit
       const diamSummary = diamondsCollected.map(d => d.id);
       const record = {
         nickname: getNickname() || "Anonymous",
@@ -4627,7 +4636,7 @@ button:disabled { opacity: .5; cursor: not-allowed; }
   async function renderLBEntries() {
     if (lbCurrentPeriod === "today") {
       // Daily leaderboard: aggregated per player + my individual runs
-      lbTableHeader.innerHTML = "<span>#</span><span>Player</span><span>Daily</span><span>Best3</span><span>Vol.B</span><span>Runs</span>";
+      lbTableHeader.innerHTML = "<span>#</span><span>Player</span><span>Daily</span><span>Best3</span><span>Bonus</span><span>Runs</span>";
       const players = await LeaderboardAPI.getDailyLeaderboard();
       if (players.length === 0) {
         lbEntries.innerHTML = '<div class="lb-empty">No runs yet today.</div>';
@@ -4672,7 +4681,7 @@ button:disabled { opacity: .5; cursor: not-allowed; }
             const r = myRuns[j];
             const timeStr = r.timeSurvived != null ? r.timeSurvived.toFixed(1) + "s" : "-";
             const inBest3 = j < 3;
-            const label = inBest3 ? "&#9733;" : (j < 18 ? "&#9679;" : "");
+            const label = inBest3 ? "&#9733;" : "&#9679;";
             html += `<div class="lb-run-sub">
               <span style="text-align:center;${inBest3 ? "color:#ffcc66;" : ""}">${label}</span>
               <span>Run #${j + 1}</span>

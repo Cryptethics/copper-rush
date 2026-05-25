@@ -106,9 +106,9 @@
       grid-template-columns: repeat(2, 1fr);
       gap: 14px;
       margin-bottom: 24px;
-    }
-    @media (min-width: 720px) {
-      .pools { grid-template-columns: repeat(4, 1fr); }
+      max-width: 560px;
+      margin-left: auto;
+      margin-right: auto;
     }
     .ops {
       display: grid;
@@ -243,12 +243,6 @@
     </div>
 
     <h1>Prize Pool</h1>
-    <p class="lede">
-      Every paid run contributes 0.01 SOL. Each entry is split across daily, weekly,
-      and monthly leaderboards plus a lifetime jackpot. The four pool cards and the
-      total below are read live from the on-chain vault PDAs of the Copper Rush
-      Anchor program.
-    </p>
 
     <div class="total-pool">
       <div class="total-label">Total Prize Pool · on-chain</div>
@@ -262,12 +256,12 @@
         <div class="pool-amount" id="pool-daily">— SOL</div>
         <div class="pool-sub" id="sub-daily">since 00:00 local</div>
       </div>
-      <div class="pool-card">
+      <div class="pool-card" style="display:none;">
         <div class="pool-label">This Week</div>
         <div class="pool-amount" id="pool-weekly">— SOL</div>
         <div class="pool-sub" id="sub-weekly">since Monday</div>
       </div>
-      <div class="pool-card">
+      <div class="pool-card" style="display:none;">
         <div class="pool-label">This Month</div>
         <div class="pool-amount" id="pool-monthly">— SOL</div>
         <div class="pool-sub" id="sub-monthly">since day 1</div>
@@ -418,14 +412,15 @@
       return "https://solscan.io/tx/" + sig + (SOLANA_NETWORK === "mainnet-beta" ? "" : "?cluster=" + SOLANA_NETWORK);
     }
 
+    // launch-simple split — anticipates the upcoming contract (Faza A pending).
+    // On-chain program 3e8E…rUF still distributes the legacy 35/25/5/5/20/5/5
+    // until the new SPLIT_BPS is deployed; weekly/monthly will be 0% then.
     const SPLIT = [
-      { key: "daily",       label: "Daily leaderboard",   bps: 3500, color: "#fbbf24" },
-      { key: "weekly",      label: "Weekly leaderboard",  bps: 2500, color: "#f59e0b" },
-      { key: "monthly",     label: "Monthly leaderboard", bps:  500, color: "#d97706" },
-      { key: "jackpot",     label: "Jackpot",             bps:  500, color: "#10b981" },
-      { key: "treasury",    label: "Treasury",            bps: 2000, color: "#9333ea" },
+      { key: "daily",       label: "Daily leaderboard",   bps: 5500, color: "#fbbf24" },
+      { key: "treasury",    label: "Treasury",            bps: 3300, color: "#9333ea" },
       { key: "dev",         label: "Dev",                 bps:  500, color: "#3b82f6" },
       { key: "buybackBurn", label: "Buyback & burn",      bps:  500, color: "#ef4444" },
+      { key: "jackpot",     label: "Jackpot",             bps:  200, color: "#10b981" },
     ];
 
     function renderSplit() {
