@@ -1053,18 +1053,55 @@ button:disabled { opacity: .5; cursor: not-allowed; }
       animation: danger-pulse 0.5s ease-in-out infinite;
     }
 
-    /* Mobile power-up buttons — centered row under the canvas. */
+    /* Mobile power-up buttons — stacked vertically on the right, overlaid on canvas. */
     #mobile-pu {
       position: fixed;
       bottom: calc(20px + env(safe-area-inset-bottom, 0px));
-      left: 50%;
-      transform: translateX(-50%);
+      right: 16px;
       display: none;
-      flex-direction: row;
-      gap: 28px;
+      flex-direction: column;
+      gap: 12px;
       z-index: 80;
       user-select: none;
       -webkit-user-select: none;
+    }
+
+    /* Mobile D-pad — 3x3 grid on the left, overlaid on canvas. Center cell empty. */
+    #mobile-dpad {
+      position: fixed;
+      bottom: calc(20px + env(safe-area-inset-bottom, 0px));
+      left: 16px;
+      display: none;
+      grid-template-columns: repeat(3, 56px);
+      grid-template-rows:    repeat(3, 56px);
+      gap: 4px;
+      z-index: 80;
+      user-select: none;
+      -webkit-user-select: none;
+      touch-action: none;
+    }
+    .dpad-center { width: 56px; height: 56px; }
+    .dpad-btn {
+      width: 56px; height: 56px;
+      border-radius: 14px;
+      border: 1px solid rgba(255,255,255,0.18);
+      background: rgba(20,30,44,0.78);
+      color: #ffd98a;
+      font-size: 28px;
+      line-height: 1;
+      padding: 0;
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+      touch-action: none;
+      display: flex; align-items: center; justify-content: center;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.45);
+      opacity: 0.85;
+      transition: transform 0.05s, background 0.1s, border-color 0.1s;
+    }
+    .dpad-btn.pressed {
+      background: rgba(60,90,130,0.95);
+      border-color: rgba(255,200,90,0.7);
+      transform: scale(0.92);
     }
     .mobile-pu-btn {
       width: 92px; height: 92px;
@@ -1113,7 +1150,7 @@ button:disabled { opacity: .5; cursor: not-allowed; }
        desktop and overlap the canvas. Keep mobile elements hidden anywhere
        wider than the mobile breakpoint, regardless of JS. */
     @media (min-width: 901px) {
-      #mobile-hud, #mobile-pu, #mobile-time-bar { display: none !important; }
+      #mobile-hud, #mobile-pu, #mobile-time-bar, #mobile-dpad { display: none !important; }
     }
 
     /* Mobile media query — portrait OR landscape, anything ≤ 900px wide.
@@ -1641,8 +1678,18 @@ button:disabled { opacity: .5; cursor: not-allowed; }
     <div id="mhTimerFill"></div>
   </div>
 
-  <!-- Mobile movement is "drag anywhere" (no visible joystick). See touch
-       handlers in the script below. -->
+  <!-- Mobile D-pad — 8 buttons (4 cardinal + 4 diagonal) overlaid bottom-left. -->
+  <div id="mobile-dpad">
+    <button class="dpad-btn" data-dir="nw" aria-label="up-left">&#8598;</button>
+    <button class="dpad-btn" data-dir="n"  aria-label="up">&#8593;</button>
+    <button class="dpad-btn" data-dir="ne" aria-label="up-right">&#8599;</button>
+    <button class="dpad-btn" data-dir="w"  aria-label="left">&#8592;</button>
+    <span class="dpad-center" aria-hidden="true"></span>
+    <button class="dpad-btn" data-dir="e"  aria-label="right">&#8594;</button>
+    <button class="dpad-btn" data-dir="sw" aria-label="down-left">&#8601;</button>
+    <button class="dpad-btn" data-dir="s"  aria-label="down">&#8595;</button>
+    <button class="dpad-btn" data-dir="se" aria-label="down-right">&#8600;</button>
+  </div>
 
   <!-- Mobile power-up buttons with countdown label inside. -->
   <div id="mobile-pu">
@@ -4867,91 +4914,116 @@ button:disabled { opacity: .5; cursor: not-allowed; }
   });
 
   // ----------------------------
-  // Mobile touch controls — "drag anywhere" on the canvas.
-  // No visible joystick: the player walks in whatever direction the finger
-  // is dragged relative to where it first touched the canvas. A short
-  // dead-zone keeps a still finger from triggering motion.
+  // Mobile touch controls — 8-button D-pad (4 cardinals + 4 diagonals).
+  // Each button drives the same arrow keys the keyboard uses; touchstart
+  // presses, touchend/touchcancel releases. Per-button events give the
+  // lowest possible latency (no drag-vector math, no coalesced samples).
   // ----------------------------
-  const canvasEl     = document.getElementById("c");
   const mobilePu     = document.getElementById("mobile-pu");
   const mobileHud    = document.getElementById("mobile-hud");
   const mobileTimeBar = document.getElementById("mobile-time-bar");
+  const mobileDpad   = document.getElementById("mobile-dpad");
   const mhTime       = document.getElementById("mhTime");
   const mhCopper     = document.getElementById("mhCopper");
   const mhDiam       = document.getElementById("mhDiam");
   const mhTimerFill  = document.getElementById("mhTimerFill");
 
-  // Drag state
-  let dragPointerId = null;
-  let dragStartX    = 0;
-  let dragStartY    = 0;
-  const DRAG_DEAD     = 4;    // pixels — finger must travel this far to fire a direction
-  const DRAG_DIAG_BIAS = 0.55; // weaker-axis-over-stronger ratio to fire diagonals
-                               // (higher = cardinal directions stay pure longer,
-                               //  diagonal only triggers near a true 45° drag)
+  const DPAD_DIR_KEYS = {
+    n:  ["arrowup"],
+    s:  ["arrowdown"],
+    w:  ["arrowleft"],
+    e:  ["arrowright"],
+    nw: ["arrowup", "arrowleft"],
+    ne: ["arrowup", "arrowright"],
+    sw: ["arrowdown", "arrowleft"],
+    se: ["arrowdown", "arrowright"],
+  };
+  const dpadActive = new Set();
+  // Per-touch tracking so the finger can slide across buttons without lifting:
+  // identifier -> currently-pressed dir (or null if the finger is outside).
+  const dpadTouchMap = new Map();
 
-  function setArrowKeys(left, right, up, down) {
-    if (left)  keys.add("arrowleft");  else keys.delete("arrowleft");
-    if (right) keys.add("arrowright"); else keys.delete("arrowright");
-    if (up)    keys.add("arrowup");    else keys.delete("arrowup");
-    if (down)  keys.add("arrowdown");  else keys.delete("arrowdown");
+  function dpadPress(dir) {
+    if (!DPAD_DIR_KEYS[dir]) return;
+    dpadActive.add(dir);
+    for (const k of DPAD_DIR_KEYS[dir]) keys.add(k);
   }
-  function clearArrowKeys() { setArrowKeys(false, false, false, false); }
-
-  function updateDragKeys(curX, curY) {
-    const dx = curX - dragStartX;
-    const dy = curY - dragStartY;
-    const dist = Math.hypot(dx, dy);
-    if (dist < DRAG_DEAD) { clearArrowKeys(); return; }
-    const ax = Math.abs(dx), ay = Math.abs(dy);
-    const maxA = Math.max(ax, ay);
-    const minA = Math.min(ax, ay);
-    const diag = (minA / maxA) >= DRAG_DIAG_BIAS;
-    const left  = dx < 0 && (ax === maxA || diag);
-    const right = dx > 0 && (ax === maxA || diag);
-    const up    = dy < 0 && (ay === maxA || diag);
-    const down  = dy > 0 && (ay === maxA || diag);
-    setArrowKeys(left, right, up, down);
+  function dpadRelease(dir) {
+    if (!DPAD_DIR_KEYS[dir]) return;
+    dpadActive.delete(dir);
+    // Only drop a key if no other still-active diagonal/cardinal still holds it.
+    for (const k of DPAD_DIR_KEYS[dir]) {
+      let stillHeld = false;
+      for (const other of dpadActive) {
+        if (DPAD_DIR_KEYS[other].includes(k)) { stillHeld = true; break; }
+      }
+      if (!stillHeld) keys.delete(k);
+    }
+  }
+  function dpadClearAll() {
+    for (const dir of dpadActive) {
+      for (const k of DPAD_DIR_KEYS[dir]) keys.delete(k);
+    }
+    dpadActive.clear();
+    dpadTouchMap.clear();
+    if (mobileDpad) mobileDpad.querySelectorAll(".dpad-btn.pressed").forEach(b => b.classList.remove("pressed"));
   }
 
-  if (canvasEl) {
-    // Pointer Events path — preferred over touch events on iOS WebKit /
-    // Android Chrome because the browser dispatches them faster and the
-    // coalesced-events API lets us read the freshest touch sample.
-    // Only touches that land on the canvas start a drag; mouse pointers
-    // are ignored so desktop keyboard arrows keep working.
-    canvasEl.addEventListener("pointerdown", (e) => {
-      if (e.pointerType === "mouse") return;     // desktop uses keyboard
-      if (dragPointerId !== null) return;        // already tracking
-      dragPointerId = e.pointerId;
-      dragStartX    = e.clientX;
-      dragStartY    = e.clientY;
-      try { canvasEl.setPointerCapture(e.pointerId); } catch (_) {}
+  if (mobileDpad) {
+    // Resolve which D-pad button the finger is currently over. Returns the
+    // dir string or null if the finger is outside the D-pad.
+    function dirFromPoint(x, y) {
+      const el = document.elementFromPoint(x, y);
+      if (!el) return null;
+      const btn = el.closest(".dpad-btn");
+      if (!btn || !mobileDpad.contains(btn)) return null;
+      return btn.getAttribute("data-dir");
+    }
+    // Repaint .pressed visuals from dpadActive after every state change.
+    function paintPressed() {
+      mobileDpad.querySelectorAll(".dpad-btn").forEach(b => {
+        if (dpadActive.has(b.getAttribute("data-dir"))) b.classList.add("pressed");
+        else b.classList.remove("pressed");
+      });
+    }
+
+    mobileDpad.addEventListener("touchstart", (e) => {
       e.preventDefault();
+      for (const t of e.changedTouches) {
+        const dir = dirFromPoint(t.clientX, t.clientY);
+        if (dir) dpadPress(dir);
+        dpadTouchMap.set(t.identifier, dir);
+      }
+      paintPressed();
     }, { passive: false });
 
-    canvasEl.addEventListener("pointermove", (e) => {
-      if (e.pointerId !== dragPointerId) return;
-      // Use the freshest sample from this frame. iOS/Android coalesce
-      // multiple native pointer samples into one JS event; reading the
-      // last coalesced sample shaves ~1 frame off the perceived latency.
-      const coalesced = e.getCoalescedEvents ? e.getCoalescedEvents() : null;
-      const last = (coalesced && coalesced.length) ? coalesced[coalesced.length - 1] : e;
-      updateDragKeys(last.clientX, last.clientY);
+    mobileDpad.addEventListener("touchmove", (e) => {
       e.preventDefault();
+      for (const t of e.changedTouches) {
+        if (!dpadTouchMap.has(t.identifier)) continue;
+        const prevDir = dpadTouchMap.get(t.identifier);
+        const curDir  = dirFromPoint(t.clientX, t.clientY);
+        if (curDir !== prevDir) {
+          if (prevDir) dpadRelease(prevDir);
+          if (curDir)  dpadPress(curDir);
+          dpadTouchMap.set(t.identifier, curDir);
+        }
+      }
+      paintPressed();
     }, { passive: false });
 
-    const endDrag = (e) => {
-      if (e.pointerId !== dragPointerId) return;
-      dragPointerId = null;
-      clearArrowKeys();
-      try { canvasEl.releasePointerCapture(e.pointerId); } catch (_) {}
+    const endTouches = (e) => {
+      e.preventDefault();
+      for (const t of e.changedTouches) {
+        if (!dpadTouchMap.has(t.identifier)) continue;
+        const dir = dpadTouchMap.get(t.identifier);
+        if (dir) dpadRelease(dir);
+        dpadTouchMap.delete(t.identifier);
+      }
+      paintPressed();
     };
-    canvasEl.addEventListener("pointerup",     endDrag);
-    canvasEl.addEventListener("pointercancel", endDrag);
-    canvasEl.addEventListener("lostpointercapture", () => {
-      if (dragPointerId !== null) { dragPointerId = null; clearArrowKeys(); }
-    });
+    mobileDpad.addEventListener("touchend",    endTouches, { passive: false });
+    mobileDpad.addEventListener("touchcancel", endTouches, { passive: false });
   }
 
   // Power-up buttons (mobile) — tap activates if available.
@@ -4996,11 +5068,11 @@ button:disabled { opacity: .5; cursor: not-allowed; }
     if (mobilePu)      mobilePu.style.display      = gameActive ? "flex"  : "none";
     if (mobileHud)     mobileHud.style.display     = gameActive ? "block" : "none";
     if (mobileTimeBar) mobileTimeBar.style.display = gameActive ? "block" : "none";
+    if (mobileDpad)    mobileDpad.style.display    = gameActive ? "grid"  : "none";
     document.body.classList.toggle("landing-on", landingActive);
     if (!gameActive) {
       // Drop any held direction when the game ends or returns to landing.
-      dragPointerId = null;
-      clearArrowKeys();
+      dpadClearAll();
     }
   }
 
