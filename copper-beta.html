@@ -4,6 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover" />
   <meta name="robots" content="noindex,nofollow" />
+  <link rel="icon" href="data:,">
   <title>Copper Rush MVP</title>
   <script src="https://bundle.run/buffer@6.0.3"></script>
   <script>window.Buffer = window.Buffer || buffer.Buffer;</script>
@@ -1795,15 +1796,64 @@ button:disabled { opacity: .5; cursor: not-allowed; }
   // Storage (coins + leaderboards)
   // ----------------------------
   const STORAGE_KEY = "copper_rush_mvp_v01";
+  // All-time stats live under a per-wallet key so wallet B never inherits
+  // wallet A's totals when both connect on the same browser. The legacy
+  // global blob is migrated once on first explicit connect, then stripped.
+  const WALLET_PROGRESS_PREFIX = "copper_rush_progress_";
+  function walletProgressKey(wallet) {
+    return wallet ? WALLET_PROGRESS_PREFIX + wallet : null;
+  }
+  function loadWalletProgress(wallet) {
+    const key = walletProgressKey(wallet);
+    if (!key) return { allTimeCopper: 0, allTimeRuns: 0 };
+    try {
+      const raw = localStorage.getItem(key);
+      if (!raw) return { allTimeCopper: 0, allTimeRuns: 0 };
+      const s = JSON.parse(raw);
+      return {
+        allTimeCopper: Number(s.allTimeCopper) || 0,
+        allTimeRuns:   Number(s.allTimeRuns)   || 0,
+      };
+    } catch { return { allTimeCopper: 0, allTimeRuns: 0 }; }
+  }
+  function saveWalletProgress(wallet, { allTimeCopper, allTimeRuns }) {
+    const key = walletProgressKey(wallet);
+    if (!key) return;
+    try {
+      localStorage.setItem(key, JSON.stringify({
+        allTimeCopper: Number(allTimeCopper) || 0,
+        allTimeRuns:   Number(allTimeRuns)   || 0,
+      }));
+    } catch {}
+  }
+  // One-shot migration: if the legacy global blob still holds allTime values
+  // and this wallet has no per-wallet entry yet, attribute those values to
+  // the explicitly-connected wallet, then zero them globally so the next
+  // wallet to connect cannot inherit them.
+  function migrateLegacyProgressTo(wallet) {
+    if (!wallet) return;
+    if (localStorage.getItem(walletProgressKey(wallet))) return;
+    let legacy;
+    try { legacy = JSON.parse(localStorage.getItem(STORAGE_KEY) || "null"); } catch { legacy = null; }
+    if (!legacy) return;
+    const lc = Number(legacy.allTimeCopper) || 0;
+    const lr = Number(legacy.allTimeRuns)   || 0;
+    if (lc === 0 && lr === 0) return;
+    saveWalletProgress(wallet, { allTimeCopper: lc, allTimeRuns: lr });
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({
+        balance: Number(legacy.balance) || 0,
+      }));
+    } catch {}
+  }
   function loadState() {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
       if (!raw) return { balance: 0, allTimeCopper: 0, allTimeRuns: 0 };
       const s = JSON.parse(raw);
       if (typeof s.balance !== "number") s.balance = 0;
-      if (typeof s.allTimeCopper !== "number") s.allTimeCopper = 0;
-      if (typeof s.allTimeRuns !== "number") s.allTimeRuns = 0;
-      return s;
+      // allTime fields are wallet-scoped now — never sourced from the global blob.
+      return { balance: s.balance, allTimeCopper: 0, allTimeRuns: 0 };
     } catch {
       return { balance: 0, allTimeCopper: 0, allTimeRuns: 0 };
     }
@@ -1811,9 +1861,13 @@ button:disabled { opacity: .5; cursor: not-allowed; }
   function saveState() {
     localStorage.setItem(STORAGE_KEY, JSON.stringify({
       balance: persist.balance,
-      allTimeCopper: persist.allTimeCopper,
-      allTimeRuns: persist.allTimeRuns,
     }));
+    if (walletPublicKey) {
+      saveWalletProgress(walletPublicKey, {
+        allTimeCopper: persist.allTimeCopper,
+        allTimeRuns:   persist.allTimeRuns,
+      });
+    }
   }
 
   // ----------------------------
@@ -5026,19 +5080,23 @@ button:disabled { opacity: .5; cursor: not-allowed; }
 
     // Check for existing username claim + load map/corner progress
     setNicknameStatus("Checking nickname...", "info");
+    // One-shot legacy migration: attribute any leftover global allTime values
+    // to this explicitly-connected wallet, then strip the global blob so the
+    // next wallet cannot inherit them.
+    migrateLegacyProgressTo(walletPublicKey);
     const [existing, savedProgress] = await Promise.all([
       UsernameAPI.getForWallet(walletPublicKey),
       ProgressAPI.get(walletPublicKey),
     ]);
     if (walletPublicKey !== publicKey.toString()) return; // disconnected mid-check
 
-    // Merge remote (Supabase) with local (localStorage shadow) using max() so
-    // a player who toggles between copper-rush.com and localhost never loses
-    // their all-time totals. Push merged values back if local was ahead.
-    const localRuns   = Number(persist.allTimeRuns)   || 0;
-    const localCopper = Number(persist.allTimeCopper) || 0;
-    const mergedRuns   = Math.max(savedProgress.runCount,      localRuns);
-    const mergedCopper = Math.max(savedProgress.allTimeCopper, localCopper);
+    // Merge remote (Supabase) with local (per-wallet localStorage shadow)
+    // using max() so a player who toggles between copper-rush.com and localhost
+    // never loses their all-time totals. localStorage is wallet-scoped now,
+    // so wallet B's shadow cannot leak into wallet A's merge.
+    const localProg    = loadWalletProgress(walletPublicKey);
+    const mergedRuns   = Math.max(savedProgress.runCount,      localProg.allTimeRuns);
+    const mergedCopper = Math.max(savedProgress.allTimeCopper, localProg.allTimeCopper);
     runCount              = mergedRuns;
     persist.allTimeRuns   = mergedRuns;
     persist.allTimeCopper = mergedCopper;
@@ -5062,6 +5120,13 @@ button:disabled { opacity: .5; cursor: not-allowed; }
     walletPublicKey = null;
     claimedNickname = null;
     localStorage.removeItem("copper_rush_wallet");
+
+    // Reset per-wallet stats so a subsequent wallet sees a clean slate
+    // until its own values load in onWalletConnected.
+    persist.allTimeCopper = 0;
+    persist.allTimeRuns   = 0;
+    runCount              = 0;
+    updateAllTimeUI();
 
     // Landing UI
     walletStatusEl.style.display = "none";
