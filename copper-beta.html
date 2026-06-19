@@ -5321,14 +5321,15 @@ button:disabled { opacity: .5; cursor: not-allowed; }
   }
 
   // ----------------------------
-  // Copper Rush Anchor program (devnet)
-  // pay_entry replaces the old single SystemProgram.transfer to
-  // COLLECTION_WALLET. SOL is now split on-chain across 4 vault PDAs +
-  // 3 operator wallets per spec (35/25/5/5 + 20/5/5).
-  // Verified on-chain 2026-05-05: Config admin/treasury/dev/burn/entry_fee
-  // match the values below and paused == false.
+  // Copper Rush Anchor program (devnet, launch-simple)
+  // pay_entry splits SOL on-chain across 4 vault PDAs + 3 operator wallets.
+  // Launch-simple split is 55/0/0/2 (daily/weekly/monthly/jackpot) + 33/5/5
+  // (treasury/dev/burn) — see FEE_SPLIT_BPS below. Weekly and Monthly are
+  // zero at the contract level; their vaults exist but never receive funds.
+  // Verified on-chain 2026-06-19 via smoke E2E: pay_entry of 0.01 SOL
+  // produced byte-exact deltas matching FEE_SPLIT_BPS on every destination.
   // ----------------------------
-  const COPPER_PROGRAM_ID = "3e8EsKpaRaHevRLyPdWW73NELqHC1keBD6ZMVrbV2rUF";
+  const COPPER_PROGRAM_ID = "EdYmMfzFidw4epQkBBiEP3bzJLYRGbKe6uqUuqq1Ggsg";
   const TREASURY_PUBKEY   = "6CzmSfWPsy4wj3QBQ1jH8CJVULeHQRXbmK6fNPCX5V65";
   const DEV_PUBKEY        = "HaAShEiX69acKB56FEFHMrC3zJfuc5d2AXFuJVR6i2YS";
   const BURN_PUBKEY       = "Euarr1Pu3LMPWgZRcwUYEcjwfE6FzJ5W5wsN8Wm6AD39";
@@ -5498,13 +5499,13 @@ button:disabled { opacity: .5; cursor: not-allowed; }
   // so the relative deviation is smallest. This rule is deterministic: the
   // same entryFee always produces the same split.
   const FEE_SPLIT_BPS = Object.freeze({
-    daily:       3500, // 35%
-    weekly:      2500, // 25%
-    monthly:      500, //  5%
-    treasury:    2000, // 20%
+    daily:       5500, // 55%
+    weekly:         0, //  0% (launch-simple: weekly disabled at contract level)
+    monthly:        0, //  0% (launch-simple: monthly disabled at contract level)
+    treasury:    3300, // 33%
     dev:          500, //  5%
     buybackBurn:  500, //  5%
-    jackpot:      500, //  5%
+    jackpot:      200, //  2%
   }); // sum = 10000 bps = 100%
   const RESIDUAL_ASSIGNEE = "daily";
 

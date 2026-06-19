@@ -317,7 +317,7 @@
       : "https://api.mainnet-beta.solana.com";
 
     // Mirrors copper-beta.html so both pages point at the same program / vaults.
-    const COPPER_PROGRAM_ID    = "3e8EsKpaRaHevRLyPdWW73NELqHC1keBD6ZMVrbV2rUF";
+    const COPPER_PROGRAM_ID    = "EdYmMfzFidw4epQkBBiEP3bzJLYRGbKe6uqUuqq1Ggsg";
     const POOL_DAILY = 0, POOL_WEEKLY = 1, POOL_MONTHLY = 2, POOL_JACKPOT = 3;
     const VAULT_RENT_LAMPORTS  = 890880; // init_pool funds each vault with this for rent-exemption
 
@@ -410,9 +410,9 @@
       return "https://solscan.io/tx/" + sig + (SOLANA_NETWORK === "mainnet-beta" ? "" : "?cluster=" + SOLANA_NETWORK);
     }
 
-    // launch-simple split — anticipates the upcoming contract (Faza A pending).
-    // On-chain program 3e8E…rUF still distributes the legacy 35/25/5/5/20/5/5
-    // until the new SPLIT_BPS is deployed; weekly/monthly will be 0% then.
+    // launch-simple split — live on-chain via program EdYmMf…1Ggsg (Faza A).
+    // Weekly and Monthly are 0% at the contract level, so those tiles are
+    // hidden in the markup above; Daily and Jackpot stay visible.
     const SPLIT = [
       { key: "daily",       label: "Daily leaderboard",   bps: 5500, color: "#fbbf24" },
       { key: "treasury",    label: "Treasury",            bps: 3300, color: "#9333ea" },
