@@ -375,6 +375,61 @@ button:disabled { opacity: .5; cursor: not-allowed; }
       to   { text-shadow: 0 0 14px rgba(255,80,40,0.95); }
     }
 
+    /* Gameplay toasts — short non-blocking overlays announcing combo
+       tier, risk zone entry, and diamond pickups. Stack top-center with
+       z-index BELOW the frenzy banner (90) and ABOVE the mobile HUD (70). */
+    #gameplayToasts {
+      position: fixed;
+      top: 88px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 75;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+      pointer-events: none;
+    }
+    .gp-toast {
+      background: rgba(10,14,20,0.78);
+      border: 1px solid rgba(255,255,255,0.10);
+      border-radius: 10px;
+      padding: 6px 16px;
+      text-align: center;
+      box-shadow: 0 4px 14px rgba(0,0,0,0.35);
+      backdrop-filter: blur(4px);
+      -webkit-backdrop-filter: blur(4px);
+      animation-name: gp-toast;
+      animation-timing-function: ease-out;
+      animation-fill-mode: forwards;
+      opacity: 0;
+    }
+    .gp-toast .gp-main {
+      font-size: 18px;
+      font-weight: 800;
+      letter-spacing: 0.05em;
+      line-height: 1.1;
+      color: #ffd98a;
+    }
+    .gp-toast .gp-sub {
+      font-size: 11px;
+      color: rgba(255,235,200,0.85);
+      margin-top: 2px;
+      letter-spacing: 0.03em;
+    }
+    @keyframes gp-toast {
+      0%   { opacity: 0; transform: translateY(-10px) scale(0.94); }
+      12%  { opacity: 1; transform: translateY(0)     scale(1.0); }
+      85%  { opacity: 1; transform: translateY(0)     scale(1.0); }
+      100% { opacity: 0; transform: translateY(-4px)  scale(0.98); }
+    }
+    @media (max-width: 900px) {
+      #gameplayToasts { top: 60px; gap: 4px; }
+      .gp-toast       { padding: 4px 12px; }
+      .gp-toast .gp-main { font-size: 15px; }
+      .gp-toast .gp-sub  { font-size: 10px; }
+    }
+
     /* Leaderboard section */
     .lb-entry {
       display: flex; justify-content: space-between; align-items: center;
@@ -1761,6 +1816,9 @@ button:disabled { opacity: .5; cursor: not-allowed; }
     </div>
   </div>
 
+  <!-- Gameplay toasts — combo tier-ups, risk zone entry, diamond pickups. -->
+  <div id="gameplayToasts" aria-hidden="true"></div>
+
 <script>
 (() => {
   // ----------------------------
@@ -3112,6 +3170,9 @@ button:disabled { opacity: .5; cursor: not-allowed; }
     ghostRiskBoost = 0;
     playerOnRiskTile = false;
     frenzyActive = false;
+    comboLastTier = 0;
+    lastRiskToastT = 0;
+    clearGameplayToasts();
 
     puAvail = { mag:false, spd:false };
     puActive = { magUntil:0, spdUntil:0 };
@@ -3287,6 +3348,16 @@ button:disabled { opacity: .5; cursor: not-allowed; }
       comboCount = 0;
     }
     lastCopperTime = t;
+    // Toast on combo tier transition (5/10/15/20/25). Resetting combo
+    // to 0 lowers the tier but does NOT trigger a toast — only upward
+    // transitions toast.
+    const newTier = comboTier(comboCount);
+    if (newTier > comboLastTier) {
+      const mult = getComboMultiplier().toFixed(1);
+      const tierColor = newTier >= 4 ? "#ff5544" : (newTier >= 2 ? "#ff9944" : "#ffcc44");
+      pushToast("COMBO x" + mult, null, tierColor, 850);
+    }
+    comboLastTier = newTier;
   }
 
   function getComboMultiplier() {
@@ -3308,6 +3379,67 @@ button:disabled { opacity: .5; cursor: not-allowed; }
     // Force reflow so the animation restarts cleanly on retrigger.
     void elFrenzyBanner.offsetWidth;
     elFrenzyBanner.classList.add("show");
+  }
+
+  // ----------------------------
+  // Gameplay toasts — short overlays announcing existing mechanics
+  // (combo tier-ups, risk zone entry, diamond pickups). Pure UI; the
+  // underlying scoring / mechanics are unchanged.
+  // ----------------------------
+  const TOAST_STACK_MAX = 4;
+  let comboLastTier = 0;          // last combo tier toasted (0 = none)
+  let lastRiskToastT = 0;         // ms timestamp of last risk-zone toast
+  const RISK_TOAST_COOLDOWN = 3000; // re-arm risk toast no more than once per 3s
+
+  function comboTier(count) {
+    if (count >= 25) return 5;
+    if (count >= 20) return 4;
+    if (count >= 15) return 3;
+    if (count >= 10) return 2;
+    if (count >=  5) return 1;
+    return 0;
+  }
+
+  function pushToast(text, sub, color, duration) {
+    if (!elGameplayToasts) return;
+    duration = duration || 1100;
+    // Cap stack: evict oldest if over the limit.
+    while (elGameplayToasts.children.length >= TOAST_STACK_MAX) {
+      elGameplayToasts.removeChild(elGameplayToasts.firstChild);
+    }
+    const el = document.createElement("div");
+    el.className = "gp-toast";
+    el.style.animationDuration = duration + "ms";
+    const main = document.createElement("div");
+    main.className = "gp-main";
+    main.textContent = text;
+    if (color) main.style.color = color;
+    el.appendChild(main);
+    if (sub) {
+      const subEl = document.createElement("div");
+      subEl.className = "gp-sub";
+      subEl.textContent = sub;
+      el.appendChild(subEl);
+    }
+    elGameplayToasts.appendChild(el);
+    // Hold the element through its animation, then remove from DOM.
+    setTimeout(() => { if (el.parentNode) el.parentNode.removeChild(el); }, duration + 50);
+  }
+
+  function clearGameplayToasts() {
+    if (!elGameplayToasts) return;
+    while (elGameplayToasts.firstChild) {
+      elGameplayToasts.removeChild(elGameplayToasts.firstChild);
+    }
+  }
+
+  // Maps a DIAMOND_TYPES entry to a toast description. Mirrors the
+  // pickup particle palette so the toast color matches the spawn burst.
+  function diamondLabelFor(dt) {
+    if (dt.jackpot)              return { text: "BLACK DIAMOND", sub: "JACKPOT!",           color: "#dadcff" };
+    if (dt.color === "gold")     return { text: "GOLD DIAMOND",  sub: "Score x" + dt.scoreMult, color: "#ffd700" };
+    if (dt.color === "green")    return { text: "GREEN DIAMOND", sub: "Score x" + dt.scoreMult, color: "#6bff6b" };
+    /* default = blue */          return { text: "BLUE DIAMOND",  sub: "+" + dt.scoreAdd + " score", color: "#a8d4ff" };
   }
 
   function copperValueAt(tileKey) {
@@ -3398,6 +3530,11 @@ button:disabled { opacity: .5; cursor: not-allowed; }
                        dt.color === "gold" ? "#ffd700" :
                        dt.color === "black" ? "#c0c0ff" : "#a8d4ff";
         spawnParticles(d.tx * TILE + TILE/2, d.ty * TILE + TILE/2, pColor, 14, 1.5);
+
+        // Toast announcing diamond type/effect (UI only — effect itself
+        // is already applied above via diamondScoreAdd/diamondScoreMult).
+        const dl = diamondLabelFor(dt);
+        pushToast(dl.text, dl.sub, dl.color, 1300);
 
         activeDiamonds.splice(i, 1);
         break;
@@ -3610,6 +3747,12 @@ button:disabled { opacity: .5; cursor: not-allowed; }
     // Risk zone detection — boost ghost while player is on risk tile
     const {tx: ptx, ty: pty} = tileAtWorld(player.x, player.y);
     const onRisk = riskTiles.has(ptx + "," + pty);
+    // Toast on first frame of entering a risk zone, rate-limited so
+    // walking the edge does not spam the overlay.
+    if (onRisk && !playerOnRiskTile && (t - lastRiskToastT) > RISK_TOAST_COOLDOWN) {
+      pushToast("RISK ZONE", "Copper x3 · Gas +20%", "#ff6644", 1000);
+      lastRiskToastT = t;
+    }
     playerOnRiskTile = onRisk;
 
     if (onRisk) {
@@ -3663,6 +3806,7 @@ button:disabled { opacity: .5; cursor: not-allowed; }
   const elComboDisplay = document.getElementById("comboDisplay");
   const elFrenzyRow = document.getElementById("frenzyRow");
   const elFrenzyBanner = document.getElementById("frenzyBanner");
+  const elGameplayToasts = document.getElementById("gameplayToasts");
   const elTimerFill = document.getElementById("timerFill");
   const elSlotMag = document.getElementById("slotMag");
   const elSlotSpd = document.getElementById("slotSpd");
