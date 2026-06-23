@@ -3138,6 +3138,14 @@ button:disabled { opacity: .5; cursor: not-allowed; }
   let copperCollected = 0; // raw count of copper pieces
   let copperScore = 0;     // score value (normal=1, risk tile=3)
   let riskCopperCollected = 0; // copper pieces picked up from risk tiles
+  let riskCopperScore     = 0; // exact sum of val from risk-tile pickups
+
+  // Rich copper tiles (DENSE_COPPER mutator). Subset of copperSet; each
+  // rich pickup adds RICH_COPPER_COUNT to copperCollected and multiplies
+  // the pickup's val by the same factor. Combo trigger fires once per
+  // tile (not per "unit") to keep the combo window semantics intact.
+  const RICH_COPPER_COUNT = 3;
+  let richCopperSet = new Set(); // "x,y" keys of placed rich copper tiles
   // Combo system
   let comboCount = 0;
   let lastCopperTime = 0; // timestamp of last copper pickup
@@ -3250,6 +3258,8 @@ button:disabled { opacity: .5; cursor: not-allowed; }
     copperCollected = 0;
     copperScore = 0;
     riskCopperCollected = 0;
+    riskCopperScore = 0;
+    richCopperSet.clear();
     comboCount = 0;
     lastCopperTime = 0;
     ghostRiskBoost = 0;
@@ -3390,11 +3400,22 @@ button:disabled { opacity: .5; cursor: not-allowed; }
       const j = Math.floor(rng() * (i + 1));
       [eligible[i], eligible[j]] = [eligible[j], eligible[i]];
     }
-    const count = Math.min(COPPER_COUNT, eligible.length);
+    const count = Math.min(getActiveCopperCount(), eligible.length);
     for (let i=0; i<count; i++) {
       copperSet.add(eligible[i].x + "," + eligible[i].y);
     }
     // If not enough, we could allow duplicates; for MVP we assume enough.
+
+    // Rich copper tiles (DENSE_COPPER): deterministic per run via rng.
+    // Choice is the first N indices of the already-shuffled eligible[]
+    // so it stays reproducible for the same seed; no second shuffle.
+    const richRatio = (activeMutator && activeMutator.richCopperRatio) || 0;
+    if (richRatio > 0) {
+      const richTarget = Math.min(count, Math.round(count * richRatio));
+      for (let i = 0; i < richTarget; i++) {
+        richCopperSet.add(eligible[i].x + "," + eligible[i].y);
+      }
+    }
   }
 
   function setExploredAroundPlayer() {
@@ -3421,11 +3442,18 @@ button:disabled { opacity: .5; cursor: not-allowed; }
         if (copperSet.has(key)) {
           copperSet.delete(key);
           const val = copperValueAt(key);
-          copperCollected += 1;
-          copperScore += val;
-          if (val > 1) riskCopperCollected += 1;
-          registerCopperPickup();
-          spawnParticles(x * TILE + TILE/2, y * TILE + TILE/2, val > 1 ? "#ff6644" : "#ffb347", 3, 0.6);
+          const onRisk = riskTiles.has(key);
+          const isRich = richCopperSet.delete(key); // delete returns true if it was present
+          const countInc = isRich ? RICH_COPPER_COUNT : 1;
+          copperCollected += countInc;
+          copperScore += val * countInc;
+          if (onRisk) {
+            riskCopperCollected += countInc;
+            riskCopperScore     += val * countInc;
+          }
+          registerCopperPickup(); // combo trigger fires ONCE per tile
+          const partColor = isRich ? "#ffd766" : (onRisk ? "#ff6644" : "#ffb347");
+          spawnParticles(x * TILE + TILE/2, y * TILE + TILE/2, partColor, isRich ? 8 : 3, isRich ? 1.0 : 0.6);
         }
       }
     }
@@ -3548,8 +3576,12 @@ button:disabled { opacity: .5; cursor: not-allowed; }
       short: "Dense Copper",
       icon:  "⛏",          // mining pick
       color: "#ffb347",
-      desc:  "More copper to grab. Same gas pressure.",
-      copperCountMul: 1.4,        // ETAPA B: 200 -> 280 copper tiles
+      desc:  "Bigger, brighter copper. Worth 3 each.",
+      // ~15% of placed copper tiles become "rich": visually larger and
+      // brighter, each pickup contributing +3 to copperCollected and
+      // +3× to copperScore. See placeCopper() + tryPickupCopper().
+      copperCountMul: 1.4,
+      richCopperRatio: 0.15,
     },
     {
       id:    "DIAMOND_DAY",
@@ -3663,8 +3695,34 @@ button:disabled { opacity: .5; cursor: not-allowed; }
     pushToast(activeMutator.name.toUpperCase(), activeMutator.desc, activeMutator.color, 2400, { large: true });
   }
 
+  // ETAPA B getters — return the active value for each tunable, falling
+  // back to the canonical constant when no mutator is loaded or when
+  // the active mutator does not override that knob. Keep these pure;
+  // call sites should not branch on mutator id directly.
+  function getActiveCopperCount() {
+    const mul = (activeMutator && activeMutator.copperCountMul) ? activeMutator.copperCountMul : 1;
+    return Math.round(COPPER_COUNT * mul);
+  }
+  function getActiveDiamondSchedule() {
+    return (activeMutator && activeMutator.diamondSpawnSchedule) || DIAMOND_SPAWN_MS;
+  }
+  function getActiveMaxDiamonds() {
+    return (activeMutator && activeMutator.maxActiveDiamonds) || MAX_ACTIVE_DIAMONDS;
+  }
+  function getActiveRiskCopperMult() {
+    return (activeMutator && activeMutator.riskCopperMult) || RISK_COPPER_MULT;
+  }
+  function getActiveRiskGhostBoost() {
+    return (activeMutator && typeof activeMutator.riskGhostBoost === "number")
+      ? activeMutator.riskGhostBoost
+      : RISK_GHOST_BOOST;
+  }
+  function getActiveGhostRatioBoost() {
+    return (activeMutator && activeMutator.ghostRatioBoost) || 0;
+  }
+
   function copperValueAt(tileKey) {
-    const baseVal = riskTiles.has(tileKey) ? RISK_COPPER_MULT : 1;
+    const baseVal = riskTiles.has(tileKey) ? getActiveRiskCopperMult() : 1;
     return frenzyActive ? baseVal * FRENZY_COPPER_MULT : baseVal;
   }
 
@@ -3674,14 +3732,23 @@ button:disabled { opacity: .5; cursor: not-allowed; }
     if (copperSet.has(key)) {
       copperSet.delete(key);
       const val = copperValueAt(key);
-      copperCollected += 1;
-      copperScore += val;
-      if (val > 1) riskCopperCollected += 1;
-      registerCopperPickup();
+      const onRisk = riskTiles.has(key);
+      const isRich = richCopperSet.delete(key);
+      const countInc = isRich ? RICH_COPPER_COUNT : 1;
+      copperCollected += countInc;
+      copperScore += val * countInc;
+      if (onRisk) {
+        riskCopperCollected += countInc;
+        riskCopperScore     += val * countInc;
+      }
+      registerCopperPickup(); // combo trigger fires ONCE per tile
       sfxPickupCopper();
-      const color = val > 1 ? "#ff6644" : "#ffb347";
-      const count = val > 1 ? 10 : 6;
-      spawnParticles(tx * TILE + TILE/2, ty * TILE + TILE/2, color, count, 1);
+      const color = isRich ? "#ffd766" : (onRisk ? "#ff6644" : "#ffb347");
+      // Rich pickups get a bigger particle burst; risk pickups stay
+      // at the original 10-particle burst; normal pickups at 6.
+      const partCount = isRich ? 18 : (val > 1 ? 10 : 6);
+      const partSpeed = isRich ? 1.4 : 1.0;
+      spawnParticles(tx * TILE + TILE/2, ty * TILE + TILE/2, color, partCount, partSpeed);
     }
   }
 
@@ -3701,13 +3768,16 @@ button:disabled { opacity: .5; cursor: not-allowed; }
   }
 
   function spawnDiamonds(elapsedMs) {
-    // fixed spawn times, but respect max active 2; if full, defer to later frames
-    while (diamondScheduleIdx < DIAMOND_SPAWN_MS.length) {
-      const target = DIAMOND_SPAWN_MS[diamondScheduleIdx];
+    // Mutator can swap in a denser schedule (Diamond Day). Max active
+    // diamonds stays 2 by design; new spawns wait until a slot opens.
+    const schedule  = getActiveDiamondSchedule();
+    const maxActive = getActiveMaxDiamonds();
+    while (diamondScheduleIdx < schedule.length) {
+      const target = schedule[diamondScheduleIdx];
       if (elapsedMs < target) break;
 
       // time reached; attempt spawn if capacity
-      if (activeDiamonds.length >= MAX_ACTIVE_DIAMONDS) break;
+      if (activeDiamonds.length >= maxActive) break;
 
       // pick a random walkable tile (guaranteed not a wall)
       const walkables = getWalkableTiles();
@@ -3833,25 +3903,50 @@ button:disabled { opacity: .5; cursor: not-allowed; }
   let ghostPathTarget = null;
   let ghostPathAge = 0;
 
+  // Sub-tile line-of-sight from ghost to player. Used to gate the
+  // close-range direct-seek path: if a wall sits between us, fall back
+  // to BFS so the ghost rounds the corner instead of grinding into it.
+  function ghostHasLineOfSightToPlayer() {
+    const ax = ghost.x, ay = ghost.y;
+    const bx = player.x, by = player.y;
+    const dx = bx - ax, dy = by - ay;
+    const len = Math.hypot(dx, dy);
+    if (len < 0.01) return true;
+    const steps = Math.max(2, Math.ceil(len * 4)); // 4 samples per tile
+    for (let i = 1; i < steps; i++) {
+      const f = i / steps;
+      const tx = Math.floor(ax + dx * f);
+      const ty = Math.floor(ay + dy * f);
+      if (isWall(tx, ty)) return false;
+    }
+    return true;
+  }
+
   function updateGhost(dtSec, elapsedSec) {
     // Base ghost speed + risk zone boost, capped at 105% of current player speed
     const spdActive = now() < puActive.spdUntil;
     const playerSpeed = PLAYER_BASE_SPEED * (spdActive ? 1.5 : 1.0);
     const maxGhostSpeed = playerSpeed * GHOST_MAX_PLAYER_RATIO;
-    const baseGhostSpeed = PLAYER_BASE_SPEED * ghostRatio(elapsedSec);
+    // FAST_GAS mutator adds a constant boost to the ghost speed ratio.
+    // The GHOST_MAX_PLAYER_RATIO cap still applies via maxGhostSpeed.
+    const baseGhostSpeed = PLAYER_BASE_SPEED * (ghostRatio(elapsedSec) + getActiveGhostRatioBoost());
     const speed = Math.min(maxGhostSpeed, baseGhostSpeed * (1 + ghostRiskBoost));
 
     const dist = Math.hypot(player.x - ghost.x, player.y - ghost.y);
     let vx = 0, vy = 0;
 
-    if (dist < 2.0) {
-      // Close range: direct seek towards player position (not tile center)
+    // Close range AND clear line-of-sight: direct seek toward player.
+    // Without the LOS check, a player could shelter behind a 1-tile wall
+    // and the ghost would grind into the wall (collide rollback zeros
+    // movement). When LOS is blocked, fall through to BFS so the ghost
+    // routes around obstacles even at short Euclidean distance.
+    if (dist < 2.0 && ghostHasLineOfSightToPlayer()) {
       vx = player.x - ghost.x;
       vy = player.y - ghost.y;
       const len = Math.hypot(vx, vy) || 1;
       vx /= len; vy /= len;
     } else {
-      // Long range: BFS pathfinding through maze
+      // Long range OR wall in the way: BFS pathfinding through maze
       const gTx = Math.floor(ghost.x), gTy = Math.floor(ghost.y);
       const pTx = Math.floor(player.x), pTy = Math.floor(player.y);
 
@@ -3977,8 +4072,9 @@ button:disabled { opacity: .5; cursor: not-allowed; }
     playerOnRiskTile = onRisk;
 
     if (onRisk) {
-      // Full boost while standing on risk tile
-      ghostRiskBoost = RISK_GHOST_BOOST;
+      // Full boost while standing on risk tile. HIGH_RISK mutator can
+      // bump this above the default 0.20 via getActiveRiskGhostBoost().
+      ghostRiskBoost = getActiveRiskGhostBoost();
     } else if (ghostRiskBoost > 0) {
       // Decay over 2 seconds after leaving risk tile
       ghostRiskBoost = Math.max(0, ghostRiskBoost - dtSec * 0.10);
@@ -4289,7 +4385,9 @@ button:disabled { opacity: .5; cursor: not-allowed; }
     }
 
     endCopper.textContent = String(copperCollected);
-    endRiskCopper.textContent = riskCopperCollected > 0 ? riskCopperCollected + " (" + (riskCopperCollected * RISK_COPPER_MULT) + " val)" : "0";
+    endRiskCopper.textContent = riskCopperCollected > 0
+      ? riskCopperCollected + " (" + Math.round(riskCopperScore) + " val)"
+      : "0";
 
     // Combo display in end screen
     const endComboRow = document.getElementById("endComboRow");
@@ -4726,41 +4824,78 @@ button:disabled { opacity: .5; cursor: not-allowed; }
       ctx.stroke();
     }
 
-    // Draw copper - ore piles
+    // Draw copper - ore piles. Rich tiles (DENSE_COPPER) are visibly
+    // larger and brighter with a softly pulsing golden glow so players
+    // can pick them out at a distance.
     for (const key of copperSet) {
       const [xS, yS] = key.split(",");
       const x = Number(xS), y = Number(yS);
       const cx = x * TILE + TILE / 2, cy = y * TILE + TILE / 2;
-      const h = tileHash(x + 100, y + 100);
+      const isRich = richCopperSet.has(key);
 
-      // Warm glow
-      const g = ctx.createRadialGradient(cx, cy, 2, cx, cy, 14);
-      g.addColorStop(0, "rgba(220,140,50,0.5)");
-      g.addColorStop(1, "rgba(220,140,50,0)");
-      ctx.fillStyle = g;
-      ctx.beginPath();
-      ctx.arc(cx, cy, 14, 0, Math.PI * 2);
-      ctx.fill();
+      if (isRich) {
+        // Rich pile — 1.5x scale, golden tint, pulsing radial glow.
+        const pulse = 0.78 + 0.22 * Math.sin(t / 220);
+        const g = ctx.createRadialGradient(cx, cy, 3, cx, cy, 22);
+        g.addColorStop(0, "rgba(255,210,90," + (0.62 * pulse).toFixed(3) + ")");
+        g.addColorStop(0.5, "rgba(255,180,60," + (0.32 * pulse).toFixed(3) + ")");
+        g.addColorStop(1, "rgba(255,160,40,0)");
+        ctx.fillStyle = g;
+        ctx.beginPath();
+        ctx.arc(cx, cy, 22, 0, Math.PI * 2);
+        ctx.fill();
 
-      // Main ore pile - irregular shape (3 overlapping circles)
-      ctx.fillStyle = "#c47832";
-      ctx.beginPath();
-      ctx.arc(cx - 2, cy + 1, 4.5, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.fillStyle = "#d4883a";
-      ctx.beginPath();
-      ctx.arc(cx + 2.5, cy - 0.5, 3.5, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.fillStyle = "#b06828";
-      ctx.beginPath();
-      ctx.arc(cx, cy + 2.5, 3, 0, Math.PI * 2);
-      ctx.fill();
+        // Main ore pile — bigger, more saturated colors.
+        ctx.fillStyle = "#e8a040";
+        ctx.beginPath();
+        ctx.arc(cx - 3, cy + 1.5, 6.8, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = "#ffc060";
+        ctx.beginPath();
+        ctx.arc(cx + 3.5, cy - 0.5, 5.2, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = "#c87828";
+        ctx.beginPath();
+        ctx.arc(cx, cy + 3.5, 4.5, 0, Math.PI * 2);
+        ctx.fill();
 
-      // Metallic highlight
-      ctx.fillStyle = "rgba(255,200,120,0.6)";
-      ctx.beginPath();
-      ctx.arc(cx - 1, cy - 2, 1.8, 0, Math.PI * 2);
-      ctx.fill();
+        // Metallic highlights — two specular dots.
+        ctx.fillStyle = "rgba(255,240,180,0.85)";
+        ctx.beginPath();
+        ctx.arc(cx - 1.5, cy - 2.5, 2.4, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = "rgba(255,255,220,0.5)";
+        ctx.beginPath();
+        ctx.arc(cx + 1.5, cy + 1, 1.2, 0, Math.PI * 2);
+        ctx.fill();
+      } else {
+        // Normal pile — unchanged from baseline.
+        const g = ctx.createRadialGradient(cx, cy, 2, cx, cy, 14);
+        g.addColorStop(0, "rgba(220,140,50,0.5)");
+        g.addColorStop(1, "rgba(220,140,50,0)");
+        ctx.fillStyle = g;
+        ctx.beginPath();
+        ctx.arc(cx, cy, 14, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = "#c47832";
+        ctx.beginPath();
+        ctx.arc(cx - 2, cy + 1, 4.5, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = "#d4883a";
+        ctx.beginPath();
+        ctx.arc(cx + 2.5, cy - 0.5, 3.5, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = "#b06828";
+        ctx.beginPath();
+        ctx.arc(cx, cy + 2.5, 3, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = "rgba(255,200,120,0.6)";
+        ctx.beginPath();
+        ctx.arc(cx - 1, cy - 2, 1.8, 0, Math.PI * 2);
+        ctx.fill();
+      }
     }
 
     // Draw diamonds - color-coded gems
@@ -6257,6 +6392,9 @@ button:disabled { opacity: .5; cursor: not-allowed; }
 
       // Refresh prize pool immediately after successful payment
       loadPrizePool();
+      // Refresh wallet SOL balance so the panel reflects the entry fee
+      // debit immediately (handles initial pay AND Play Again retries).
+      if (walletPublicKey) fetchSolBalance(walletPublicKey);
 
       hidePayOverlay();
       return signature;
