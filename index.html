@@ -429,6 +429,75 @@ button:disabled { opacity: .5; cursor: not-allowed; }
       .gp-toast .gp-main { font-size: 15px; }
       .gp-toast .gp-sub  { font-size: 10px; }
     }
+    /* Large variant — used for the daily-mutator run-start announce. */
+    .gp-toast.gp-toast-large {
+      padding: 16px 36px;
+      border-radius: 14px;
+    }
+    .gp-toast.gp-toast-large .gp-main {
+      font-size: 34px;
+      letter-spacing: 0.08em;
+      line-height: 1.1;
+    }
+    .gp-toast.gp-toast-large .gp-sub {
+      font-size: 14px;
+      margin-top: 6px;
+    }
+    @media (max-width: 900px) {
+      .gp-toast.gp-toast-large           { padding: 12px 24px; }
+      .gp-toast.gp-toast-large .gp-main  { font-size: 24px; }
+      .gp-toast.gp-toast-large .gp-sub   { font-size: 12px; }
+    }
+
+    /* Daily Mutator — landing card (visible on landing page).
+       Compact pill above the Play buttons announcing today's twist.
+       Color accent comes from the mutator object via inline style. */
+    #dailyMutatorCard {
+      margin: 10px auto 12px auto;
+      padding: 10px 14px;
+      border-radius: 12px;
+      background: rgba(20,28,40,0.55);
+      border: 1px solid rgba(255,255,255,0.10);
+      display: flex; flex-direction: column; align-items: center;
+      gap: 4px;
+      max-width: 360px;
+      width: 100%;
+      align-self: center;
+    }
+    #dailyMutatorCard .mut-label {
+      font-size: 10px; letter-spacing: 0.16em;
+      text-transform: uppercase;
+      color: rgba(255,255,255,0.45);
+    }
+    #dailyMutatorCard .mut-name {
+      font-size: 18px; font-weight: 800; letter-spacing: 0.04em;
+    }
+    #dailyMutatorCard .mut-desc {
+      font-size: 11px;
+      color: rgba(255,235,200,0.7);
+      text-align: center;
+      line-height: 1.35;
+    }
+    #dailyMutatorCard .mut-icon { margin-right: 6px; }
+    #dailyMutatorCard.dev-override {
+      border-color: rgba(255,200,80,0.45);
+      box-shadow: 0 0 0 1px rgba(255,200,80,0.20) inset;
+    }
+    #dailyMutatorCard .mut-dev-tag {
+      font-size: 9px; letter-spacing: 0.18em;
+      color: #ffcc66;
+      margin-top: 2px;
+      text-transform: uppercase;
+    }
+
+    /* Daily Mutator — HUD row in the right panel during a run.
+       Sister of combo-row / frenzy-row. */
+    .mut-row { transition: opacity 0.3s; }
+    .mut-row .v {
+      font-weight: 800;
+      letter-spacing: 0.04em;
+    }
+    .mut-row .mut-pill-ico { margin-right: 4px; }
 
     /* Leaderboard section */
     .lb-entry {
@@ -1419,16 +1488,23 @@ button:disabled { opacity: .5; cursor: not-allowed; }
         <input id="nicknameInput" type="text" maxlength="20" placeholder="Anonymous" autocomplete="off" spellcheck="false" />
         <div id="nicknameStatus" class="nickname-status"></div>
       </div>
-      <div class="landing-rules">
-        &#9656; Collect <b style="color:#ffb347;">copper nuggets</b> and <b style="color:#8bb8ff;">diamonds</b> before time runs out<br>
-        &#9656; Avoid the <b style="color:#6bffb6;">toxic gas</b> - it gets faster over time<br>
-        &#9656; Use power-ups: <span>1</span> Magnet &bull; <span>2</span> Speed<br>
-        &#9656; Move with <span>WASD</span> or <span>Arrow Keys</span>
+      <!-- Daily Mutator — today's twist (UTC-aligned, same for all players). -->
+      <div id="dailyMutatorCard" aria-live="polite">
+        <div class="mut-label">Today's Daily Mutator (UTC)</div>
+        <div class="mut-name"><span class="mut-icon" id="dmCardIcon">&#9935;</span><span id="dmCardName">-</span></div>
+        <div class="mut-desc" id="dmCardDesc">Loading...</div>
       </div>
 
       <div class="play-buttons">
         <button id="btnPlayPaid" disabled>&#127942; Compete for 0.01 SOL</button>
         <button id="btnPlayFree">&#9654; Play Free Demo</button>
+      </div>
+
+      <div class="landing-rules">
+        &#9656; Collect <b style="color:#ffb347;">copper nuggets</b> and <b style="color:#8bb8ff;">diamonds</b> before time runs out<br>
+        &#9656; Avoid the <b style="color:#6bffb6;">toxic gas</b> - it gets faster over time<br>
+        &#9656; Use power-ups: <span>1</span> Magnet &bull; <span>2</span> Speed<br>
+        &#9656; Move with <span>WASD</span> or <span>Arrow Keys</span>
       </div>
 
       <div style="margin-top:20px; font-size:10px; opacity:0.2; letter-spacing:1px;">
@@ -1488,8 +1564,17 @@ button:disabled { opacity: .5; cursor: not-allowed; }
         <span id="panelWalletAddr">-</span>
       </div>
 
-      <!-- Collection -->
+      <!-- Daily Mutator (HUD row) -->
       <div class="panel-section">
+        <div class="section-title">Today</div>
+        <div class="row mut-row" id="hudMutatorRow">
+          <span class="k">Mutator</span>
+          <span class="v mono" id="hudMutatorValue">-</span>
+        </div>
+      </div>
+
+      <!-- Collection -->
+      <div class="panel-section" style="margin-top:8px;">
         <div class="section-title">Collection</div>
         <div class="row" style="align-items:baseline;">
           <span><span class="stat-icon">&#9874;</span><span class="k">Copper</span></span>
@@ -1713,7 +1798,7 @@ button:disabled { opacity: .5; cursor: not-allowed; }
 
         <div class="end-warn mode-paid" id="endWarn" style="display:none;">Submit to Leaderboard or Redeem for coins.</div>
 
-        <button class="btn-share mode-paid" id="btnShare">&#128203; Copy Score to Clipboard</button>
+        <button class="btn-share" id="btnShare">&#128203; Copy Score to Clipboard</button>
 
         <!-- Weekly Progress dropdown — hidden in launch-simple; DOM kept so JS writes are no-ops -->
         <div class="end-weekly-toggle" style="display:none;" onclick="document.getElementById('endWeeklyDetails').classList.toggle('collapsed');this.querySelector('.dd-arrow').classList.toggle('open');">
@@ -3174,6 +3259,12 @@ button:disabled { opacity: .5; cursor: not-allowed; }
     lastRiskToastT = 0;
     clearGameplayToasts();
 
+    // Lock today's mutator for the duration of this run, then announce
+    // it via the existing toast system. ETAPA A: UI-only; gameplay
+    // values still read the original constants (effects come in ETAPA B).
+    activeMutator = getDailyMutator();
+    triggerMutatorRunStart();
+
     puAvail = { mag:false, spd:false };
     puActive = { magUntil:0, spdUntil:0 };
     puUsed = { mag:false, spd:false };
@@ -3400,15 +3491,16 @@ button:disabled { opacity: .5; cursor: not-allowed; }
     return 0;
   }
 
-  function pushToast(text, sub, color, duration) {
+  function pushToast(text, sub, color, duration, opts) {
     if (!elGameplayToasts) return;
     duration = duration || 1100;
+    opts = opts || {};
     // Cap stack: evict oldest if over the limit.
     while (elGameplayToasts.children.length >= TOAST_STACK_MAX) {
       elGameplayToasts.removeChild(elGameplayToasts.firstChild);
     }
     const el = document.createElement("div");
-    el.className = "gp-toast";
+    el.className = "gp-toast" + (opts.large ? " gp-toast-large" : "");
     el.style.animationDuration = duration + "ms";
     const main = document.createElement("div");
     main.className = "gp-main";
@@ -3440,6 +3532,135 @@ button:disabled { opacity: .5; cursor: not-allowed; }
     if (dt.color === "gold")     return { text: "GOLD DIAMOND",  sub: "Score x" + dt.scoreMult, color: "#ffd700" };
     if (dt.color === "green")    return { text: "GREEN DIAMOND", sub: "Score x" + dt.scoreMult, color: "#6bff6b" };
     /* default = blue */          return { text: "BLUE DIAMOND",  sub: "+" + dt.scoreAdd + " score", color: "#a8d4ff" };
+  }
+
+  // ----------------------------
+  // Daily Mutator — ETAPA A: scaffolding + UI only.
+  // The mutator config and selection logic live here, but gameplay
+  // effects are NOT yet wired in (placeCopper / spawnDiamonds /
+  // ghostRatio / risk values still read the original constants).
+  // Effects will be plugged in via getActive*() helpers in ETAPA B.
+  // ----------------------------
+  const MUTATORS = [
+    {
+      id:    "DENSE_COPPER",
+      name:  "Dense Copper",
+      short: "Dense Copper",
+      icon:  "⛏",          // mining pick
+      color: "#ffb347",
+      desc:  "More copper to grab. Same gas pressure.",
+      copperCountMul: 1.4,        // ETAPA B: 200 -> 280 copper tiles
+    },
+    {
+      id:    "DIAMOND_DAY",
+      name:  "Diamond Day",
+      short: "Diamond Day",
+      icon:  "\u{1F48E}",        // gem
+      color: "#a8d4ff",
+      desc:  "Diamonds spawn faster. Rare caps unchanged.",
+      diamondSpawnSchedule: [3000, 6500, 10000, 13500, 17000, 21000, 25000], // 7 spawns vs 5
+      // MAX_ACTIVE_DIAMONDS stays 2 per design directive.
+    },
+    {
+      id:    "FAST_GAS",
+      name:  "Fast Gas",
+      short: "Fast Gas",
+      icon:  "\u{1F4A8}",        // dash
+      color: "#6bffb6",
+      desc:  "Gas accelerates faster. Frenzy unchanged.",
+      ghostRatioBoost: 0.10,
+    },
+    {
+      id:    "HIGH_RISK",
+      name:  "High Risk",
+      short: "High Risk",
+      icon:  "\u{1F525}",        // fire
+      color: "#ff5544",
+      desc:  "Risk zones pay big. Gas hunts harder there.",
+      riskCopperMult:   4,        // vs default 3
+      riskGhostBoost:   0.30,     // vs default 0.20
+    },
+  ];
+
+  // Dev-only URL override: ?mutator=DENSE_COPPER bypasses the UTC roll.
+  // Parsed once at module load. Invalid values fall through to UTC.
+  const MUTATOR_OVERRIDE_ID = (function () {
+    try {
+      const v = new URLSearchParams(location.search).get("mutator");
+      if (!v) return null;
+      const id = v.trim().toUpperCase();
+      return MUTATORS.some(m => m.id === id) ? id : null;
+    } catch (e) { return null; }
+  })();
+
+  // Returns the mutator for the current UTC day, OR the dev override
+  // if URL provided a valid one. Deterministic per UTC date globally.
+  function getDailyMutator() {
+    if (MUTATOR_OVERRIDE_ID) {
+      const m = MUTATORS.find(x => x.id === MUTATOR_OVERRIDE_ID);
+      if (m) return m;
+    }
+    const d = new Date();
+    const utcKey = d.getUTCFullYear() * 10000 + (d.getUTCMonth() + 1) * 100 + d.getUTCDate();
+    let h = utcKey >>> 0;
+    h = Math.imul(h ^ (h >>> 13), 0x85ebca6b);
+    h = Math.imul(h ^ (h >>> 16), 0xc2b2ae35);
+    h = (h ^ (h >>> 16)) >>> 0;
+    return MUTATORS[h % MUTATORS.length];
+  }
+
+  // Frozen for the duration of a run. Set in resetRun() so the mutator
+  // cannot change mid-run if the clock crosses a UTC boundary.
+  let activeMutator = null;
+
+  // Renders the landing-page mutator card. Safe to call repeatedly;
+  // pulls the latest UTC mutator each call so a long-running landing
+  // session would update if the day rolls over.
+  function updateLandingMutatorCard() {
+    if (!elDailyMutatorCard) return;
+    const m = getDailyMutator();
+    if (elDmCardIcon) elDmCardIcon.textContent = m.icon || "⛏";
+    if (elDmCardName) {
+      elDmCardName.textContent = m.name;
+      elDmCardName.style.color = m.color || "#ffd98a";
+    }
+    if (elDmCardDesc) elDmCardDesc.textContent = m.desc;
+    // Visual marker when running with ?mutator=... so devs do not confuse
+    // an override session with the canonical daily roll.
+    elDailyMutatorCard.classList.toggle("dev-override", !!MUTATOR_OVERRIDE_ID);
+    let tag = elDailyMutatorCard.querySelector(".mut-dev-tag");
+    if (MUTATOR_OVERRIDE_ID) {
+      if (!tag) {
+        tag = document.createElement("div");
+        tag.className = "mut-dev-tag";
+        tag.textContent = "DEV OVERRIDE";
+        elDailyMutatorCard.appendChild(tag);
+      }
+    } else if (tag) {
+      tag.remove();
+    }
+  }
+
+  // Renders the in-run HUD row showing the active mutator. Called from
+  // updateHUD() each frame; cheap because it only touches text/color
+  // when the active mutator changes.
+  function updateHudMutatorRow() {
+    if (!elHudMutatorRow || !elHudMutatorValue) return;
+    if (!activeMutator) {
+      elHudMutatorRow.style.display = "none";
+      return;
+    }
+    elHudMutatorRow.style.display = "";
+    elHudMutatorValue.innerHTML =
+      '<span class="mut-pill-ico">' + activeMutator.icon + '</span>' + activeMutator.short;
+    elHudMutatorValue.style.color = activeMutator.color || "#ffd98a";
+  }
+
+  // Fires once per run, right after activeMutator is locked, announcing
+  // today's twist via the existing toast subsystem.
+  function triggerMutatorRunStart() {
+    if (!activeMutator) return;
+    pushToast(activeMutator.name.toUpperCase(), activeMutator.desc, activeMutator.color, 2400, { large: true });
   }
 
   function copperValueAt(tileKey) {
@@ -3807,6 +4028,12 @@ button:disabled { opacity: .5; cursor: not-allowed; }
   const elFrenzyRow = document.getElementById("frenzyRow");
   const elFrenzyBanner = document.getElementById("frenzyBanner");
   const elGameplayToasts = document.getElementById("gameplayToasts");
+  const elDailyMutatorCard = document.getElementById("dailyMutatorCard");
+  const elDmCardIcon = document.getElementById("dmCardIcon");
+  const elDmCardName = document.getElementById("dmCardName");
+  const elDmCardDesc = document.getElementById("dmCardDesc");
+  const elHudMutatorRow = document.getElementById("hudMutatorRow");
+  const elHudMutatorValue = document.getElementById("hudMutatorValue");
   const elTimerFill = document.getElementById("timerFill");
   const elSlotMag = document.getElementById("slotMag");
   const elSlotSpd = document.getElementById("slotSpd");
@@ -3890,6 +4117,9 @@ button:disabled { opacity: .5; cursor: not-allowed; }
 
     // Frenzy HUD — visible only while frenzyActive is true. Set by update().
     if (elFrenzyRow) elFrenzyRow.style.display = frenzyActive ? "" : "none";
+
+    // Daily Mutator HUD row — pulls the locked activeMutator each frame.
+    updateHudMutatorRow();
 
     updatePowerupSlot(elSlotMag, elMagStatus, "mag", "1", PU_MAG_MS);
     updatePowerupSlot(elSlotSpd, elSpdStatus, "spd", "2", PU_SPD_MS);
@@ -3996,6 +4226,7 @@ button:disabled { opacity: .5; cursor: not-allowed; }
     elAllTimeRuns.textContent = String(persist.allTimeRuns);
   }
   updateAllTimeUI(); // initial render
+  updateLandingMutatorCard(); // initial render of today's mutator on landing
 
   const btnStartNew = document.getElementById("btnStartNew");
   let idleState = false;
@@ -4003,6 +4234,7 @@ button:disabled { opacity: .5; cursor: not-allowed; }
   function enterIdleState() {
     idleState = true;
     btnStartNew.style.display = "";
+    updateLandingMutatorCard(); // refresh in case the UTC day rolled over
   }
 
   btnStartNew.addEventListener("click", async () => {
@@ -4202,7 +4434,8 @@ button:disabled { opacity: .5; cursor: not-allowed; }
     btnShare.onclick = () => {
       const diamStr = totalDiam > 0 ? ` | Diamonds: ${totalDiam}` : "";
       const endStr = died ? `Caught at ${timeSurvived.toFixed(1)}s` : `Survived (${timeSurvived.toFixed(1)}s)`;
-      const text = `Copper Rush | Score: ${lb.score} | Copper: ${copperCollected}${diamStr} | ${endStr}`;
+      const mutStr = activeMutator ? ` | Daily: ${activeMutator.name}` : "";
+      const text = `Copper Rush | Score: ${lb.score} | Copper: ${copperCollected}${diamStr} | ${endStr}${mutStr}`;
       navigator.clipboard.writeText(text).then(() => {
         btnShare.textContent = "Copied!";
         setTimeout(() => btnShare.textContent = "\u{1F4CB} Copy Score to Clipboard", 2000);
