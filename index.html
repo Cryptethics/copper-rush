@@ -1777,9 +1777,9 @@ button:disabled { opacity: .5; cursor: not-allowed; }
           <span class="end-stat-label">&#128142; Diamonds</span>
           <span class="end-stat-value diamond-color mono" id="endDiam">-</span>
         </div>
-        <div class="end-stat-row mode-paid" id="endComboRow" style="display:none;">
-          <span class="end-stat-label">Combo multiplier</span>
-          <span class="end-stat-value mono" id="endCombo" style="color:#ff6;">1.0x</span>
+        <div class="end-stat-row" id="endComboRow">
+          <span class="end-stat-label">Max combo</span>
+          <span class="end-stat-value mono" id="endCombo" style="color:#ff6;">0 (1.0x)</span>
         </div>
         <div class="end-stat-row">
           <span class="end-stat-label">&#9201; Time survived</span>
@@ -3148,6 +3148,7 @@ button:disabled { opacity: .5; cursor: not-allowed; }
   let richCopperSet = new Set(); // "x,y" keys of placed rich copper tiles
   // Combo system
   let comboCount = 0;
+  let maxComboCount = 0; // peak combo reached this run (for endscreen)
   let lastCopperTime = 0; // timestamp of last copper pickup
   const COMBO_WINDOW = 1000; // ms – collect within 1s to keep combo
   const COMBO_MAX = 25;
@@ -3261,6 +3262,7 @@ button:disabled { opacity: .5; cursor: not-allowed; }
     riskCopperScore = 0;
     richCopperSet.clear();
     comboCount = 0;
+    maxComboCount = 0;
     lastCopperTime = 0;
     ghostRiskBoost = 0;
     playerOnRiskTile = false;
@@ -3466,6 +3468,7 @@ button:disabled { opacity: .5; cursor: not-allowed; }
     } else {
       comboCount = 0;
     }
+    if (comboCount > maxComboCount) maxComboCount = comboCount;
     lastCopperTime = t;
     // Toast on combo tier transition (5/10/15/20/25). Resetting combo
     // to 0 lowers the tier but does NOT trigger a toast — only upward
@@ -4389,15 +4392,17 @@ button:disabled { opacity: .5; cursor: not-allowed; }
       ? riskCopperCollected + " (" + Math.round(riskCopperScore) + " val)"
       : "0";
 
-    // Combo display in end screen
-    const endComboRow = document.getElementById("endComboRow");
+    // Combo display in end screen — always show the PEAK combo reached
+    // this run. lb.comboMult reads the LIVE comboCount which decays after
+    // COMBO_WINDOW, so it under-reports the player's actual achievement.
     const endComboEl = document.getElementById("endCombo");
-    if (lb.comboMult > 1.0) {
-      endComboRow.style.display = "";
-      endComboEl.textContent = lb.comboMult.toFixed(1) + "x";
-    } else {
-      endComboRow.style.display = "none";
-    }
+    const peakMult =
+      maxComboCount >= 25 ? 1.5 :
+      maxComboCount >= 20 ? 1.4 :
+      maxComboCount >= 15 ? 1.3 :
+      maxComboCount >= 10 ? 1.2 :
+      maxComboCount >= 5  ? 1.1 : 1.0;
+    endComboEl.textContent = maxComboCount + " (" + peakMult.toFixed(1) + "x)";
 
     // Diamond breakdown
     const totalDiam = diamondsCollected.length;
