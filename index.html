@@ -917,6 +917,111 @@ button:disabled { opacity: .5; cursor: not-allowed; }
       letter-spacing: 1px;
       animation: fadeSlideIn 1.2s ease-out 0.8s both;
     }
+    /* Developer panel — floating bottom-right, visible only when ?dev=1
+       is in the URL. Controls every dev toggle (map, mutator, seed, fog,
+       audit). State persists in localStorage so reopening the page with
+       ?dev=1 restores the panel. Public users never see this. */
+    #devPanel {
+      position: fixed;
+      bottom: 12px;
+      right: 12px;
+      z-index: 9999;
+      background: rgba(15, 23, 36, 0.94);
+      border: 1px solid rgba(126, 231, 135, 0.4);
+      border-radius: 8px;
+      padding: 10px 12px;
+      font-family: system-ui, sans-serif;
+      font-size: 12px;
+      color: #cbd5e1;
+      width: 248px;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+    }
+    .dp-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+      border-bottom: 1px solid rgba(126,231,135,0.2);
+      padding-bottom: 4px;
+    }
+    .dp-title {
+      font-weight: 700;
+      color: #7ee787;
+      letter-spacing: 1.2px;
+      font-size: 10px;
+      text-transform: uppercase;
+    }
+    .dp-collapse {
+      background: none;
+      border: none;
+      color: #cbd5e1;
+      cursor: pointer;
+      font-size: 14px;
+      padding: 0 6px;
+      line-height: 1;
+    }
+    .dp-collapse:hover { color: #7ee787; }
+    #dpBody.collapsed { display: none; }
+    .dp-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-bottom: 6px;
+    }
+    .dp-label {
+      flex: 0 0 56px;
+      font-size: 10px;
+      opacity: 0.7;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+    }
+    .dp-row select,
+    .dp-row input[type="text"] {
+      flex: 1;
+      background: rgba(20,30,45,0.85);
+      color: #e2e8f0;
+      border: 1px solid rgba(126,231,135,0.25);
+      border-radius: 4px;
+      padding: 3px 6px;
+      font-size: 11px;
+      font-family: inherit;
+      min-width: 0;
+    }
+    .dp-row select:focus,
+    .dp-row input:focus {
+      outline: 1px solid rgba(126,231,135,0.55);
+    }
+    .dp-checks { gap: 14px; }
+    .dp-checks label {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 11px;
+      cursor: pointer;
+      opacity: 0.9;
+    }
+    .dp-checks input { cursor: pointer; }
+    #dpReset {
+      width: 100%;
+      background: rgba(255,80,80,0.18);
+      border: 1px solid rgba(255,80,80,0.4);
+      color: #ff9b9b;
+      border-radius: 4px;
+      padding: 5px;
+      font-size: 10px;
+      letter-spacing: 1.2px;
+      text-transform: uppercase;
+      cursor: pointer;
+      font-family: inherit;
+    }
+    #dpReset:hover { background: rgba(255,80,80,0.32); }
+    .dp-note {
+      font-size: 9px;
+      opacity: 0.4;
+      margin-top: 6px;
+      text-align: center;
+      letter-spacing: 0.5px;
+    }
 
     /* Free mode — hide paid-only UI */
     body.free-mode .mode-paid { display: none !important; }
@@ -1903,6 +2008,37 @@ button:disabled { opacity: .5; cursor: not-allowed; }
 
   <!-- Gameplay toasts — combo tier-ups, risk zone entry, diamond pickups. -->
   <div id="gameplayToasts" aria-hidden="true"></div>
+
+  <!-- Developer panel — initialized + revealed by JS only when ?dev=1
+       is in the URL. Persists settings in localStorage. -->
+  <div id="devPanel" style="display:none;">
+    <div class="dp-head">
+      <span class="dp-title">Dev Panel</span>
+      <button class="dp-collapse" id="dpToggle" title="Collapse/expand">&minus;</button>
+    </div>
+    <div class="dp-body" id="dpBody">
+      <div class="dp-row">
+        <span class="dp-label">Map</span>
+        <select id="dpMap"></select>
+      </div>
+      <div class="dp-row">
+        <span class="dp-label">Mutator</span>
+        <select id="dpMutator"></select>
+      </div>
+      <div class="dp-row">
+        <span class="dp-label">Seed</span>
+        <input id="dpSeed" type="text" placeholder="(random)" autocomplete="off">
+      </div>
+      <div class="dp-row dp-checks">
+        <label><input type="checkbox" id="dpNoFog"> No fog</label>
+        <label><input type="checkbox" id="dpMapAudit"> Map audit</label>
+      </div>
+      <div class="dp-row">
+        <button id="dpReset">Reset dev settings</button>
+      </div>
+      <div class="dp-note">?dev=1 only &middot; saved in localStorage</div>
+    </div>
+  </div>
 
 <script>
 (() => {
@@ -2962,6 +3098,34 @@ button:disabled { opacity: .5; cursor: not-allowed; }
   const COPPER_COUNT = 200;
   const EXCLUDE_R = 2;            // manhattan radius from starts
   const FOG_R = 2;                // tiles radius visible
+  // Developer mode. Public game (no ?dev=1) sees zero audit UI and a
+  // fully normal play loop. With ?dev=1, a floating panel appears with
+  // every toggle (map, mutator, fog, audit, seed). Panel state lives in
+  // localStorage so reopening with ?dev=1 restores the prior config.
+  // No other query string is recognized — ?dev=1 is the only switch.
+  const DEV_TOOLS_ENABLED = (function () {
+    try { return new URLSearchParams(location.search).get("dev") === "1"; }
+    catch (e) { return false; }
+  })();
+  const DEV_LS_KEY = "copper_rush_dev_panel_v1";
+  function _devDefaults() {
+    return { map: "", mutator: "", seed: "", noFog: false, mapAudit: false };
+  }
+  const devSettings = DEV_TOOLS_ENABLED ? (function () {
+    try {
+      const raw = localStorage.getItem(DEV_LS_KEY);
+      return raw ? Object.assign(_devDefaults(), JSON.parse(raw)) : _devDefaults();
+    } catch (e) { return _devDefaults(); }
+  })() : null;
+  function saveDevSettings() {
+    if (!devSettings) return;
+    try { localStorage.setItem(DEV_LS_KEY, JSON.stringify(devSettings)); } catch (e) {}
+  }
+  function devNoFog()        { return !!(devSettings && devSettings.noFog); }
+  function devMapAudit()     { return !!(devSettings && devSettings.mapAudit); }
+  function devForcedMapId()  { return devSettings ? devSettings.map     : ""; }
+  function devForcedMutator(){ return devSettings ? devSettings.mutator : ""; }
+  let mapAuditLastClick = null;
   const DIAMOND_SPAWN_MS = [5000, 10000, 15000, 20000, 25000];
   const DIAMOND_TTL_MS = 7000;
   const MAX_ACTIVE_DIAMONDS = 2;
@@ -3099,6 +3263,27 @@ button:disabled { opacity: .5; cursor: not-allowed; }
   const canvas = document.getElementById("c");
   const ctx = canvas.getContext("2d");
 
+  // Dev panel canvas click handler — attached once when ?dev=1 is on,
+  // but only logs/highlights when the panel's "Map audit" checkbox is
+  // currently checked. Public users (no dev=1) get no listener at all.
+  if (DEV_TOOLS_ENABLED) {
+    canvas.addEventListener("click", (e) => {
+      if (!devMapAudit()) return;
+      const rect = canvas.getBoundingClientRect();
+      const scaleX = canvas.width / rect.width;
+      const scaleY = canvas.height / rect.height;
+      const px = (e.clientX - rect.left) * scaleX;
+      const py = (e.clientY - rect.top) * scaleY;
+      const tx = Math.floor(px / TILE);
+      const ty = Math.floor(py / TILE);
+      if (tx < 0 || ty < 0 || tx >= GRID_W || ty >= GRID_H) return;
+      const ch = (grid && grid[ty]) ? grid[ty][tx] : "?";
+      mapAuditLastClick = { tx, ty, ch };
+      const label = ch === "#" ? "wall=#" : (ch === "." ? "floor=." : "char=" + ch);
+      console.log("tile clicked: x=" + tx + " y=" + ty + " " + label);
+    });
+  }
+
   // ----------------------------
   // Persistent state
   // ----------------------------
@@ -3230,8 +3415,16 @@ button:disabled { opacity: .5; cursor: not-allowed; }
     // Paid mode: each map played 2x; every full cycle through MAPS advances the spawn corner.
     let playerSpawn, ghostSpawn;
     if (gameMode === "free") {
-      const mapIdx = freeRunCount % FREE_MAPS.length;
-      map = FREE_MAPS[mapIdx];
+      // Dev override takes precedence — when the panel picked a map,
+      // every Free run uses it. Public players always hit the rotation.
+      const forcedId = devForcedMapId();
+      if (forcedId) {
+        const all = [...FREE_MAPS, ...MAPS];
+        map = all.find(m => m.id === forcedId) || FREE_MAPS[0];
+      } else {
+        const mapIdx = freeRunCount % FREE_MAPS.length;
+        map = FREE_MAPS[mapIdx];
+      }
       playerSpawn = map.playerStart;
       ghostSpawn  = map.ghostStart;
       freeRunCount++;
@@ -3626,22 +3819,13 @@ button:disabled { opacity: .5; cursor: not-allowed; }
     },
   ];
 
-  // Dev-only URL override: ?mutator=DENSE_COPPER bypasses the UTC roll.
-  // Parsed once at module load. Invalid values fall through to UTC.
-  const MUTATOR_OVERRIDE_ID = (function () {
-    try {
-      const v = new URLSearchParams(location.search).get("mutator");
-      if (!v) return null;
-      const id = v.trim().toUpperCase();
-      return MUTATORS.some(m => m.id === id) ? id : null;
-    } catch (e) { return null; }
-  })();
-
   // Returns the mutator for the current UTC day, OR the dev override
-  // if URL provided a valid one. Deterministic per UTC date globally.
+  // from the Developer Panel if dev=1 is on and the panel selected a
+  // valid mutator id. Deterministic per UTC date for public users.
   function getDailyMutator() {
-    if (MUTATOR_OVERRIDE_ID) {
-      const m = MUTATORS.find(x => x.id === MUTATOR_OVERRIDE_ID);
+    const devId = devForcedMutator();
+    if (devId) {
+      const m = MUTATORS.find(x => x.id === devId);
       if (m) return m;
     }
     const d = new Date();
@@ -3669,11 +3853,12 @@ button:disabled { opacity: .5; cursor: not-allowed; }
       elDmCardName.style.color = m.color || "#ffd98a";
     }
     if (elDmCardDesc) elDmCardDesc.textContent = m.desc;
-    // Visual marker when running with ?mutator=... so devs do not confuse
-    // an override session with the canonical daily roll.
-    elDailyMutatorCard.classList.toggle("dev-override", !!MUTATOR_OVERRIDE_ID);
+    // Visual marker when the Dev Panel overrides the mutator so devs do
+    // not confuse an override session with the canonical daily roll.
+    const _devOverride = !!devForcedMutator();
+    elDailyMutatorCard.classList.toggle("dev-override", _devOverride);
     let tag = elDailyMutatorCard.querySelector(".mut-dev-tag");
-    if (MUTATOR_OVERRIDE_ID) {
+    if (_devOverride) {
       if (!tag) {
         tag = document.createElement("div");
         tag.className = "mut-dev-tag";
@@ -5129,13 +5314,13 @@ button:disabled { opacity: .5; cursor: not-allowed; }
     drawGameParticles();
 
     // Fog of war
-    drawFog();
+    if (!devNoFog()) drawFog();
     // Diamond beacons (drawn after fog so they punch through darkness)
     drawDiamondBeacons();
 
     // Frenzy edge vignette — subtle red-orange radial glow on canvas edges,
     // slow breathing pulse (~0.6 Hz). Never opaque enough to obscure gameplay.
-    if (frenzyActive) {
+    if (frenzyActive && !devNoFog()) {
       const pulse = 0.22 + 0.08 * Math.sin(t / 250);
       const cx = canvas.width / 2, cy = canvas.height / 2;
       const grad = ctx.createRadialGradient(cx, cy, canvas.width * 0.32, cx, cy, canvas.width * 0.72);
@@ -5144,6 +5329,47 @@ button:disabled { opacity: .5; cursor: not-allowed; }
       ctx.fillStyle = grad;
       ctx.fillRect(0, 0, canvas.width, canvas.height);
     }
+
+    if (devMapAudit()) drawMapAuditOverlay();
+  }
+
+  // ?mapAudit=1 helper — grid lines, last-clicked tile highlight, and a
+  // small coord readout in the top-left. Pure dev tool.
+  function drawMapAuditOverlay() {
+    ctx.save();
+    ctx.strokeStyle = "rgba(255,255,255,0.10)";
+    ctx.lineWidth = 1;
+    for (let x = 0; x <= GRID_W; x++) {
+      ctx.beginPath();
+      ctx.moveTo(x * TILE + 0.5, 0);
+      ctx.lineTo(x * TILE + 0.5, GRID_H * TILE);
+      ctx.stroke();
+    }
+    for (let y = 0; y <= GRID_H; y++) {
+      ctx.beginPath();
+      ctx.moveTo(0, y * TILE + 0.5);
+      ctx.lineTo(GRID_W * TILE, y * TILE + 0.5);
+      ctx.stroke();
+    }
+    if (mapAuditLastClick) {
+      const {tx, ty} = mapAuditLastClick;
+      ctx.strokeStyle = "rgba(255,235,59,0.95)";
+      ctx.lineWidth = 2;
+      ctx.strokeRect(tx * TILE + 1, ty * TILE + 1, TILE - 2, TILE - 2);
+    }
+    ctx.fillStyle = "rgba(0,0,0,0.78)";
+    ctx.fillRect(4, 4, 210, 24);
+    ctx.fillStyle = "#ffeb3b";
+    ctx.font = "12px monospace";
+    ctx.textBaseline = "top";
+    if (mapAuditLastClick) {
+      const {tx, ty, ch} = mapAuditLastClick;
+      const label = ch === "#" ? "wall=#" : "floor=.";
+      ctx.fillText("tile x=" + tx + " y=" + ty + " " + label, 8, 10);
+    } else {
+      ctx.fillText("?mapAudit=1 — click any tile", 8, 10);
+    }
+    ctx.restore();
   }
 
   function drawFog() {
@@ -5247,6 +5473,75 @@ button:disabled { opacity: .5; cursor: not-allowed; }
   const btnPlayFree = document.getElementById("btnPlayFree");
   const btnPlayPaid = document.getElementById("btnPlayPaid");
   const btnPlayAgain = document.getElementById("btnPlayAgain");
+
+  // Dev panel init — runs only when ?dev=1. Populates the map + mutator
+  // selects, restores any persisted state from localStorage, wires the
+  // change/click handlers so edits are saved automatically, and reveals
+  // the floating panel. Paid Mode never reads any of these values.
+  (function initDevPanel() {
+    if (!DEV_TOOLS_ENABLED || !devSettings) return;
+    const panel = document.getElementById("devPanel");
+    const elMap     = document.getElementById("dpMap");
+    const elMutator = document.getElementById("dpMutator");
+    const elSeed    = document.getElementById("dpSeed");
+    const elNoFog   = document.getElementById("dpNoFog");
+    const elAudit   = document.getElementById("dpMapAudit");
+    const elReset   = document.getElementById("dpReset");
+    const elToggle  = document.getElementById("dpToggle");
+    const elBody    = document.getElementById("dpBody");
+    if (!panel || !elMap || !elMutator) return;
+
+    const mkOpt = (val, label) => {
+      const o = document.createElement("option");
+      o.value = val; o.textContent = label;
+      return o;
+    };
+
+    // Map dropdown — Free + Paid maps grouped.
+    elMap.appendChild(mkOpt("", "Auto rotate (default)"));
+    const grpFree = document.createElement("optgroup");
+    grpFree.label = "Free maps (" + FREE_MAPS.length + ")";
+    FREE_MAPS.forEach(m => grpFree.appendChild(mkOpt(m.id, m.id + " — " + m.name)));
+    elMap.appendChild(grpFree);
+    const grpPaid = document.createElement("optgroup");
+    grpPaid.label = "Paid maps (" + MAPS.length + ")";
+    MAPS.forEach(m => grpPaid.appendChild(mkOpt(m.id, m.id + " — " + m.name)));
+    elMap.appendChild(grpPaid);
+
+    // Mutator dropdown — empty = use UTC daily mutator.
+    elMutator.appendChild(mkOpt("", "Daily (UTC)"));
+    MUTATORS.forEach(m => elMutator.appendChild(mkOpt(m.id, m.id + " — " + m.name)));
+
+    // Restore prior settings (validate ids before applying).
+    const allMapIds = new Set([...FREE_MAPS, ...MAPS].map(m => m.id));
+    if (devSettings.map && allMapIds.has(devSettings.map)) elMap.value = devSettings.map;
+    else devSettings.map = "";
+    const mutIds = new Set(MUTATORS.map(m => m.id));
+    if (devSettings.mutator && mutIds.has(devSettings.mutator)) elMutator.value = devSettings.mutator;
+    else devSettings.mutator = "";
+    elSeed.value  = devSettings.seed || "";
+    elNoFog.checked = !!devSettings.noFog;
+    elAudit.checked = !!devSettings.mapAudit;
+
+    elMap.addEventListener("change",     () => { devSettings.map     = elMap.value;       saveDevSettings(); });
+    elMutator.addEventListener("change", () => { devSettings.mutator = elMutator.value;   saveDevSettings(); });
+    elSeed.addEventListener("input",     () => { devSettings.seed    = elSeed.value;      saveDevSettings(); });
+    elNoFog.addEventListener("change",   () => { devSettings.noFog   = elNoFog.checked;   saveDevSettings(); });
+    elAudit.addEventListener("change",   () => { devSettings.mapAudit= elAudit.checked;   saveDevSettings(); });
+
+    elReset.addEventListener("click", () => {
+      Object.assign(devSettings, _devDefaults());
+      saveDevSettings();
+      elMap.value = ""; elMutator.value = ""; elSeed.value = "";
+      elNoFog.checked = false; elAudit.checked = false;
+    });
+    elToggle.addEventListener("click", () => {
+      elBody.classList.toggle("collapsed");
+      elToggle.textContent = elBody.classList.contains("collapsed") ? "+" : "−";
+    });
+
+    panel.style.display = "";
+  })();
   const playHint = document.getElementById("playHint");
   const pCanvas = document.getElementById("particles-canvas");
   const pCtx = pCanvas.getContext("2d");
