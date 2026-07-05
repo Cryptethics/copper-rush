@@ -2154,7 +2154,13 @@ button:disabled { opacity: .5; cursor: not-allowed; }
   // Helpers
   // ----------------------------
   const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
-  const now = () => performance.now();
+  // Synthetic-time hook used by the visibility catch-up. When the tab
+  // returns from background we step now() forward in fixed increments
+  // so every caller inside update() (leftMs, frenzy entry, power-ups,
+  // diamond schedule, combo decay) sees the simulation tick by tick.
+  // _nowOverride is null during normal play.
+  let _nowOverride = null;
+  const now = () => _nowOverride !== null ? _nowOverride : performance.now();
 
   function mulberry32(seed) {
     let t = seed >>> 0;
@@ -5457,6 +5463,16 @@ button:disabled { opacity: .5; cursor: not-allowed; }
   // Loop
   // ----------------------------
   let last = now();
+  // Wall clock at the moment the tab went hidden. Cleared after catch-up
+  // runs. The simulation never pauses — the timer (tStart/tEnd) keeps
+  // ticking as wall clock, exactly like a competitive online game. On
+  // return we re-simulate every tick that would have happened.
+  let hiddenAtT = 0;
+  // Fixed step for the catch-up loop. 16ms ≈ 60Hz, finer than the 60ms
+  // cap in the live loop so ghost moves at most ~0.1 tile per step —
+  // well under the wall thickness, so collisions never get skipped.
+  const VIS_CATCHUP_STEP_MS = 16;
+
   function loop() {
     const t = now();
     const dt = Math.min(60, t - last);
@@ -5464,6 +5480,36 @@ button:disabled { opacity: .5; cursor: not-allowed; }
     if (running && !ended) update(dt);
     requestAnimationFrame(loop);
   }
+
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden) {
+      // Snapshot the wall clock and drop any held keys so they don't
+      // auto-drive the player during the catch-up sweep.
+      if (running && !ended) {
+        hiddenAtT = performance.now();
+        keys.clear();
+      }
+    } else if (hiddenAtT > 0) {
+      const startT = hiddenAtT;
+      const endT = performance.now();
+      hiddenAtT = 0;
+      // Re-tick the missing interval in fixed-step substeps. Each call
+      // to update() sees a synthetic now() (= cur) so leftMs, frenzy,
+      // power-up expiry, diamond schedule, and combo decay all advance
+      // exactly as if they had ticked live. If endRun fires mid-sweep
+      // (caught or timer expired) the running/ended flags break the
+      // loop on the next iteration — no double-trigger, no overshoot.
+      let cur = startT;
+      while (cur < endT && running && !ended) {
+        const step = Math.min(VIS_CATCHUP_STEP_MS, endT - cur);
+        cur += step;
+        _nowOverride = cur;
+        update(step);
+      }
+      _nowOverride = null;
+      last = performance.now();
+    }
+  });
 
   // ----------------------------
   // Landing page particles
