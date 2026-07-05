@@ -3133,7 +3133,7 @@ button:disabled { opacity: .5; cursor: not-allowed; }
   function devForcedMutator(){ return devSettings ? devSettings.mutator : ""; }
   let mapAuditLastClick = null;
   const DIAMOND_SPAWN_MS = [5000, 10000, 15000, 20000, 25000];
-  const DIAMOND_TTL_MS = 7000;
+  const DIAMOND_TTL_MS = 8000; // Blue/Green/Gold linger — Black is persistent (see spawnDiamonds).
   const MAX_ACTIVE_DIAMONDS = 2;
 
   // Powerups times
@@ -3159,13 +3159,13 @@ button:disabled { opacity: .5; cursor: not-allowed; }
   //
   //  Type        Prob      Effect             Cap
   //  ─────────── ───────── ────────────────── ──────────────
-  //  BLUE  +50   49.99%    flat +50 score     unlimited
+  //  BLUE  +50   49.45%    flat +50 score     unlimited
   //  BLUE  +75   25.00%    flat +75 score     unlimited
   //  BLUE +100   15.00%    flat +100 score    unlimited
   //  GREEN 1.25x  7.00%    1.25× total score  max 1 / run
   //  GREEN 1.5x   2.50%    1.5× total score   max 1 / run
-  //  GOLD  2x     0.50%    2× total score     max 1 / run
-  //  BLACK JP     0.01%    jackpot event      max 1 / run
+  //  GOLD  2x     1.00%    2× total score     max 1 / run
+  //  BLACK JP     0.05%    jackpot event      max 1 / run
   //  ─────────── ─────────
   //  Total      100.00%
   //
@@ -3173,15 +3173,15 @@ button:disabled { opacity: .5; cursor: not-allowed; }
   //  When a capped type is excluded, its weight is redistributed
   //  proportionally among the remaining types.
   const DIAMOND_TYPES = [
-    { id: "BLUE50",    color: "blue",  label: "+50",     prob: 0.4999, scoreAdd: 50  },
+    { id: "BLUE50",    color: "blue",  label: "+50",     prob: 0.4945, scoreAdd: 50  },
     { id: "BLUE75",    color: "blue",  label: "+75",     prob: 0.2500, scoreAdd: 75  },
     { id: "BLUE100",   color: "blue",  label: "+100",    prob: 0.1500, scoreAdd: 100 },
     { id: "GREEN125",  color: "green", label: "1.25x",   prob: 0.0700, scoreMult: 1.25 },
     { id: "GREEN150",  color: "green", label: "1.5x",    prob: 0.0250, scoreMult: 1.5 },
-    { id: "GOLD2X",    color: "gold",  label: "2x",      prob: 0.0050, scoreMult: 2.0 },
-    { id: "BLACK",     color: "black", label: "JACKPOT",  prob: 0.0001, jackpot: true },
+    { id: "GOLD2X",    color: "gold",  label: "2x",      prob: 0.0100, scoreMult: 2.0 },
+    { id: "BLACK",     color: "black", label: "JACKPOT",  prob: 0.0005, jackpot: true },
   ];
-  // Verify: 0.4999 + 0.2500 + 0.1500 + 0.0700 + 0.0250 + 0.0050 + 0.0001 = 1.0000
+  // Verify: 0.4945 + 0.2500 + 0.1500 + 0.0700 + 0.0250 + 0.0100 + 0.0005 = 1.0000
 
   // Per-run cap: max 1 green, 1 gold, 1 black diamond collected
   let collectedRareColors = { green: false, gold: false, black: false };
@@ -3979,25 +3979,31 @@ button:disabled { opacity: .5; cursor: not-allowed; }
       const target = schedule[diamondScheduleIdx];
       if (elapsedMs < target) break;
 
-      // time reached; attempt spawn if capacity
-      if (activeDiamonds.length >= maxActive) break;
+      // time reached; attempt spawn if capacity. Jackpot (BLACK) is
+      // persistent for the whole round; excluding it from the cap keeps
+      // the normal 2-slot rhythm intact so the remaining 4 spawns land
+      // on schedule instead of serializing behind Black's despawn=∞.
+      if (activeDiamonds.filter(d => !d.type.jackpot).length >= maxActive) break;
 
       // pick a random walkable tile (guaranteed not a wall)
       const walkables = getWalkableTiles();
       const node = walkables[Math.floor(rng() * walkables.length)];
       const dtype = rollDiamondEffect(rng);
       const spawnMs = target;
+      // Black (Jackpot) is the only diamond that stays on the map for
+      // the rest of the round. Blue/Green/Gold despawn after TTL.
+      const despawnMs = dtype.jackpot ? Infinity : spawnMs + DIAMOND_TTL_MS;
       activeDiamonds.push({
         x: node.x + 0.5, y: node.y + 0.5,
         tx: node.x, ty: node.y,
         type: dtype,
         spawnMs,
-        despawnMs: spawnMs + DIAMOND_TTL_MS
+        despawnMs,
       });
       diamondScheduleIdx += 1;
     }
 
-    // despawn expired
+    // despawn expired (Black uses Infinity so it never gets filtered out)
     activeDiamonds = activeDiamonds.filter(d => elapsedMs <= d.despawnMs);
   }
 
