@@ -1780,10 +1780,15 @@ button:disabled { opacity: .5; cursor: not-allowed; }
         <div class="row"><span class="k">&#127942; All time runs</span><span class="v mono" id="allTimeRuns">0</span></div>
       </div>
 
-      <!-- Free Stats (localStorage-only, per-browser) -->
+      <!-- Free Stats — source: free_players (device_id-keyed). Legacy
+           localStorage is only a fallback for All-Time Copper on the
+           pre-claim path. Runs / Best Score are 0 until a value has
+           been successfully loaded from free_players at least once. -->
       <div class="panel-section mode-free">
         <div class="section-title">Free Stats</div>
         <div class="row"><span class="k">&#9874; All-Time Copper</span><span class="v mono" id="freeAllTimeCopper" style="color:#ffb347;">0</span></div>
+        <div class="row"><span class="k">&#127942; All-Time Runs</span><span class="v mono" id="freeAllTimeRuns">0</span></div>
+        <div class="row"><span class="k">&#11088; Best Score</span><span class="v mono" id="freeBestScore" style="color:#7ee787;">0</span></div>
       </div>
 
       <!-- Free Daily Leaderboard (source: scores_free / FreeLeaderboardAPI) -->
@@ -1796,7 +1801,7 @@ button:disabled { opacity: .5; cursor: not-allowed; }
           <span class="stat-big mono" id="fdlScore" style="color:#7ee787;">0</span>
         </div>
         <div style="font-size:11px; color:#9aa3b2; padding:2px 0 4px; line-height:1.4;">
-          Daily score = best 3 runs + consistency bonus (+10% from extra runs, capped at +30%).
+          Daily score = sum of your best 3 runs + 10% of each extra run score, capped at 30% of the best-3 sum.
         </div>
         <div id="fdlDetails" class="collapsed">
           <div class="row">
@@ -3639,25 +3644,33 @@ button:disabled { opacity: .5; cursor: not-allowed; }
   const elAllTimeCopper = document.getElementById("allTimeCopper");
   const elAllTimeRuns = document.getElementById("allTimeRuns");
   const elFreeAllTimeCopper = document.getElementById("freeAllTimeCopper");
-  // Source of truth is free_players. Legacy localStorage is used only as
-  // a fallback when the row doesn't exist yet (pre-claim) or the fetch
-  // fails — never as the authoritative value once a claim has landed.
-  async function updateFreeAllTimeUI() {
-    if (!elFreeAllTimeCopper) return;
+  const elFreeAllTimeRuns   = document.getElementById("freeAllTimeRuns");
+  const elFreeBestScore     = document.getElementById("freeBestScore");
+  // Source of truth is free_players (all_time_copper, all_time_runs,
+  // best_score). Fetch success ⇒ write UI. Fetch failure or null row ⇒
+  // leave the currently displayed values alone (never wipe progress that
+  // the player can already see). The one exception is the pre-claim
+  // path (no device_id yet): copper falls back to the legacy localStorage
+  // key, runs and best show 0. A caller that already has the row (e.g.
+  // startGameFromLanding after its claim/existing check) can pass it in
+  // via `prefetchedRow` to skip a redundant round trip.
+  async function updateFreeStatsUI(prefetchedRow) {
+    if (!elFreeAllTimeCopper && !elFreeAllTimeRuns && !elFreeBestScore) return;
     let deviceId = null;
     try { deviceId = localStorage.getItem(FREE_DEVICE_ID_KEY); } catch {}
-    if (deviceId) {
-      try {
-        const row = await FreePlayerAPI.get(deviceId);
-        if (row) {
-          elFreeAllTimeCopper.textContent = String(row.all_time_copper || 0);
-          return;
-        }
-      } catch { /* fall through to legacy */ }
+    if (!deviceId) {
+      if (elFreeAllTimeCopper) elFreeAllTimeCopper.textContent = String(getLegacyFreeAllTimeCopper());
+      if (elFreeAllTimeRuns)   elFreeAllTimeRuns.textContent   = "0";
+      if (elFreeBestScore)     elFreeBestScore.textContent     = "0";
+      return;
     }
-    elFreeAllTimeCopper.textContent = String(getLegacyFreeAllTimeCopper());
+    const row = (prefetchedRow !== undefined) ? prefetchedRow : await FreePlayerAPI.get(deviceId);
+    if (!row) return; // fetch failed or row missing — do not touch UI
+    if (elFreeAllTimeCopper) elFreeAllTimeCopper.textContent = String(Number(row.all_time_copper) || 0);
+    if (elFreeAllTimeRuns)   elFreeAllTimeRuns.textContent   = String(Number(row.all_time_runs)   || 0);
+    if (elFreeBestScore)     elFreeBestScore.textContent     = String(Number(row.best_score)      || 0);
   }
-  updateFreeAllTimeUI();
+  updateFreeStatsUI();
 
   const elFDLScore  = document.getElementById("fdlScore");
   const elFDLBest3  = document.getElementById("fdlBest3");
@@ -5078,11 +5091,11 @@ button:disabled { opacity: .5; cursor: not-allowed; }
           survived:  !died,
           score:     died ? 0 : lb.score,
         }).finally(() => {
-          updateFreeAllTimeUI();
+          updateFreeStatsUI();
           updateFreeLeaderboardUI();
         });
       } else {
-        updateFreeAllTimeUI();
+        updateFreeStatsUI();
         updateFreeLeaderboardUI();
       }
     }
@@ -6213,6 +6226,7 @@ button:disabled { opacity: .5; cursor: not-allowed; }
       // considered established after a successful INSERT.
       const deviceId = getDeviceId();
       const existing = await FreePlayerAPI.get(deviceId);
+      let effectiveRow = null; // handed to updateFreeStatsUI to skip a second GET
       if (existing) {
         // Defensive: even if the input somehow shows a different string
         // (edited before initFreeIdentityUI landed, or via DevTools), the
@@ -6235,6 +6249,7 @@ button:disabled { opacity: .5; cursor: not-allowed; }
             sub: "This browser is locked to this nickname",
           };
         }
+        effectiveRow = existing;
       } else {
         const desired = (nicknameInputEl && nicknameInputEl.value ? nicknameInputEl.value : "").trim();
         if (!desired || desired.length < 2) {
@@ -6264,7 +6279,12 @@ button:disabled { opacity: .5; cursor: not-allowed; }
         saveNickname(claimRes.row.nickname);
         lockNicknameInput(claimRes.row.nickname);
         setNicknameStatus("✓ Nickname claimed · locked to this browser", "ok");
+        effectiveRow = claimRes.row;
       }
+      // Refresh Free Stats panel with the freshly-known identity, reusing
+      // the row we already have from the claim/existing check above so we
+      // don't fire a second GET against free_players for the same event.
+      updateFreeStatsUI(effectiveRow);
     }
 
     if (mode === "paid") {
