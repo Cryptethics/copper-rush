@@ -448,6 +448,61 @@ button:disabled { opacity: .5; cursor: not-allowed; }
       .gp-toast.gp-toast-large .gp-main  { font-size: 24px; }
       .gp-toast.gp-toast-large .gp-sub   { font-size: 12px; }
     }
+    /* Medium variant — ~75% of large, used for the locked-identity
+       override notice so it reads as a warning rather than a headline. */
+    .gp-toast.gp-toast-medium {
+      padding: 12px 27px;
+      border-radius: 14px;
+    }
+    .gp-toast.gp-toast-medium .gp-main {
+      font-size: 26px;
+      letter-spacing: 0.08em;
+      line-height: 1.1;
+    }
+    .gp-toast.gp-toast-medium .gp-sub {
+      font-size: 11px;
+      margin-top: 5px;
+    }
+    @media (max-width: 900px) {
+      .gp-toast.gp-toast-medium           { padding: 9px 18px; }
+      .gp-toast.gp-toast-medium .gp-main  { font-size: 18px; }
+      .gp-toast.gp-toast-medium .gp-sub   { font-size: 9px; }
+    }
+
+    /* Persistent identity badge — top-left, shown throughout free-mode
+       gameplay so the player always sees which nickname the current run
+       is being attributed to. Non-interactive, subtle. */
+    #lockedNicknameBadge {
+      position: fixed;
+      top: 8px;
+      left: 8px;
+      z-index: 71;
+      padding: 4px 10px;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      border-radius: 12px;
+      background: rgba(10,14,20,0.72);
+      border: 1px solid rgba(126,231,135,0.35);
+      color: #7ee787;
+      backdrop-filter: blur(4px);
+      -webkit-backdrop-filter: blur(4px);
+      pointer-events: none;
+      display: none;
+      white-space: nowrap;
+      max-width: 180px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    #lockedNicknameBadge.visible { display: block; }
+    #lockedNicknameBadge .lnb-label {
+      color: rgba(255,255,255,0.55);
+      font-weight: 500;
+      margin-right: 4px;
+    }
+    @media (max-width: 900px) {
+      #lockedNicknameBadge { top: 4px; left: 4px; font-size: 10px; padding: 3px 8px; max-width: 140px; }
+    }
 
     /* Daily Mutator — landing card (visible on landing page).
        Compact pill above the Play buttons announcing today's twist.
@@ -1025,18 +1080,21 @@ button:disabled { opacity: .5; cursor: not-allowed; }
 
     /* Free mode — hide paid-only UI */
     body.free-mode .mode-paid { display: none !important; }
-    body.free-mode #btnViewLB { display: none !important; }
-    body.free-mode #btnStartNew { display: none !important; }
+    body:not(.free-mode) .mode-free { display: none !important; }
     body.free-mode #panelWallet { display: none !important; }
-    body.free-mode .end-actions .btn-lb,
     body.free-mode .end-actions .btn-redeem,
-    body.free-mode .end-submit-as,
     body.free-mode .end-weekly-toggle,
     body.free-mode #endWeeklyDetails {
       display: none !important;
     }
-    /* launch-simple: paid endscreen shows only Submit Score; free endscreen shows only Play Again as exit/restart path. */
-    body:not(.free-mode) #btnPlayAgain { display: none !important; }
+    /* Free mode uses the same leaderboard modal — hide paid-only tabs. */
+    body.free-mode .lb-tab[data-period="week"],
+    body.free-mode .lb-tab[data-period="all"] {
+      display: none !important;
+    }
+    /* Play Again on the endscreen is retired; restart is via the right-panel
+       #btnStartNew (labeled "Play Again" in free, "Start New Game" in paid). */
+    #btnPlayAgain { display: none !important; }
     #btnPlayAgain {
       flex: 1;
       padding: 12px;
@@ -1592,6 +1650,7 @@ button:disabled { opacity: .5; cursor: not-allowed; }
         <label for="nicknameInput">Your name</label>
         <input id="nicknameInput" type="text" maxlength="20" placeholder="Anonymous" autocomplete="off" spellcheck="false" />
         <div id="nicknameStatus" class="nickname-status"></div>
+        <div class="landing-progress-hint" style="font-size:10px;opacity:0.55;margin-top:4px;">Progress is stored in this browser.</div>
       </div>
       <!-- Daily Mutator — today's twist (UTC-aligned, same for all players). -->
       <div id="dailyMutatorCard" aria-live="polite">
@@ -1719,6 +1778,40 @@ button:disabled { opacity: .5; cursor: not-allowed; }
         <div class="row"><span class="k">&#9670; SOL Balance</span><span class="v mono" id="solBalance" style="color:#9945FF;">- SOL</span></div>
         <div class="row"><span class="k">&#9874; All time copper</span><span class="v mono" id="allTimeCopper" style="color:#ffb347;">0</span></div>
         <div class="row"><span class="k">&#127942; All time runs</span><span class="v mono" id="allTimeRuns">0</span></div>
+      </div>
+
+      <!-- Free Stats (localStorage-only, per-browser) -->
+      <div class="panel-section mode-free">
+        <div class="section-title">Free Stats</div>
+        <div class="row"><span class="k">&#9874; All-Time Copper</span><span class="v mono" id="freeAllTimeCopper" style="color:#ffb347;">0</span></div>
+      </div>
+
+      <!-- Free Daily Leaderboard (source: scores_free / FreeLeaderboardAPI) -->
+      <div class="panel-section mode-free" style="margin-top:8px;">
+        <div class="section-title" style="cursor:pointer;display:flex;justify-content:space-between;align-items:center;" onclick="document.getElementById('fdlDetails').classList.toggle('collapsed');this.querySelector('.dd-arrow').classList.toggle('open');">
+          Daily Leaderboard <span class="dd-arrow">&#9654;</span>
+        </div>
+        <div class="row" style="align-items:baseline;">
+          <span class="k">Daily Score</span>
+          <span class="stat-big mono" id="fdlScore" style="color:#7ee787;">0</span>
+        </div>
+        <div style="font-size:11px; color:#9aa3b2; padding:2px 0 4px; line-height:1.4;">
+          Daily score = best 3 runs + consistency bonus (+10% from extra runs, capped at +30%).
+        </div>
+        <div id="fdlDetails" class="collapsed">
+          <div class="row">
+            <span class="k">Best 3 Sum</span>
+            <span class="v mono" id="fdlBest3">0</span>
+          </div>
+          <div class="row">
+            <span class="k">Consistency Bonus</span>
+            <span class="v mono" id="fdlVolume">+0</span>
+          </div>
+          <div class="row">
+            <span class="k">Runs today</span>
+            <span class="v mono" id="fdlRuns">0</span>
+          </div>
+        </div>
       </div>
 
       <!-- Daily Leaderboard -->
@@ -1878,7 +1971,7 @@ button:disabled { opacity: .5; cursor: not-allowed; }
           <span class="end-stat-label">&#9888; Risk copper</span>
           <span class="end-stat-value mono" id="endRiskCopper" style="color:#ff6644;">0</span>
         </div>
-        <div class="end-stat-row mode-paid">
+        <div class="end-stat-row">
           <span class="end-stat-label">&#128142; Diamonds</span>
           <span class="end-stat-value diamond-color mono" id="endDiam">-</span>
         </div>
@@ -1891,7 +1984,7 @@ button:disabled { opacity: .5; cursor: not-allowed; }
           <span class="end-stat-value mono" id="endTime">30.0s</span>
         </div>
 
-        <div class="end-highlight mode-paid">
+        <div class="end-highlight">
           <div class="end-highlight-label">Leaderboard Score</div>
           <div class="end-highlight-value mono" id="endScore">0</div>
         </div>
@@ -1901,7 +1994,7 @@ button:disabled { opacity: .5; cursor: not-allowed; }
           <span class="end-stat-value coin-color mono" id="endPay">0</span>
         </div>
 
-        <div class="end-warn mode-paid" id="endWarn" style="display:none;">Submit to Leaderboard or Redeem for coins.</div>
+        <div class="end-warn" id="endWarn" style="display:none;">Submit to Leaderboard or Redeem for coins.</div>
 
         <button class="btn-share" id="btnShare">&#128203; Copy Score to Clipboard</button>
 
@@ -2008,6 +2101,10 @@ button:disabled { opacity: .5; cursor: not-allowed; }
 
   <!-- Gameplay toasts — combo tier-ups, risk zone entry, diamond pickups. -->
   <div id="gameplayToasts" aria-hidden="true"></div>
+
+  <!-- Persistent free-mode identity badge — shown while playing in free
+       mode so the user can always see which nickname the run belongs to. -->
+  <div id="lockedNicknameBadge" aria-hidden="true"><span class="lnb-label">Playing as</span><span id="lnbName"></span></div>
 
   <!-- Developer panel — initialized + revealed by JS only when ?dev=1
        is in the URL. Persists settings in localStorage. -->
@@ -2270,6 +2367,58 @@ button:disabled { opacity: .5; cursor: not-allowed; }
     const trimmed = (name || "").trim().slice(0, 20) || "Anonymous";
     localStorage.setItem("copper_rush_nickname", trimmed);
     return trimmed;
+  }
+
+  // ----------------------------
+  // Free mode identity + legacy migration
+  //   device_id: UUID v4 per browser, persists across sessions in
+  //   localStorage. All free_players / scores_free identity uses this.
+  //   Legacy copper key: kept read-only as a fallback + one-shot seed for
+  //   players upgrading from the pre-device-id build. Cleared only in a
+  //   future version once we're confident the migration flag stuck.
+  // ----------------------------
+  const FREE_DEVICE_ID_KEY       = "copper_rush_device_id";
+  const FREE_ALLTIME_COPPER_KEY  = "copper_rush_free_all_time_copper"; // legacy
+  const FREE_MIGRATED_KEY        = "copper_rush_free_migrated_v1";
+
+  function uuidV4Fallback() {
+    try {
+      if (typeof crypto !== "undefined" && typeof crypto.getRandomValues === "function") {
+        const b = new Uint8Array(16);
+        crypto.getRandomValues(b);
+        b[6] = (b[6] & 0x0f) | 0x40;
+        b[8] = (b[8] & 0x3f) | 0x80;
+        const hex = Array.from(b, x => x.toString(16).padStart(2, "0")).join("");
+        return `${hex.slice(0,8)}-${hex.slice(8,12)}-${hex.slice(12,16)}-${hex.slice(16,20)}-${hex.slice(20)}`;
+      }
+    } catch {}
+    const rnd = () => Math.floor(Math.random() * 0x100000000).toString(16).padStart(8, "0");
+    return `${rnd()}-${rnd().slice(0,4)}-4${rnd().slice(0,3)}-8${rnd().slice(0,3)}-${rnd()}${rnd().slice(0,4)}`;
+  }
+
+  function getDeviceId() {
+    let id = null;
+    try { id = localStorage.getItem(FREE_DEVICE_ID_KEY); } catch {}
+    if (id && id.length >= 8 && id.length <= 64) return id;
+    let uuid = null;
+    try {
+      if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+        uuid = crypto.randomUUID();
+      }
+    } catch {}
+    if (!uuid) uuid = uuidV4Fallback();
+    try { localStorage.setItem(FREE_DEVICE_ID_KEY, uuid); } catch {}
+    return uuid;
+  }
+
+  function getLegacyFreeAllTimeCopper() {
+    return Number(localStorage.getItem(FREE_ALLTIME_COPPER_KEY)) || 0;
+  }
+  function isLegacyFreeCopperMigrated() {
+    return localStorage.getItem(FREE_MIGRATED_KEY) === "1";
+  }
+  function markLegacyFreeCopperMigrated() {
+    try { localStorage.setItem(FREE_MIGRATED_KEY, "1"); } catch {}
   }
 
   // Date helpers for Supabase filters
@@ -2668,6 +2817,276 @@ button:disabled { opacity: .5; cursor: not-allowed; }
         .filter(e => tsToWeekKey(e.ts) === wk && (e.nickname || "Anonymous") === nickname)
         .map(e => ({ score: e.score, ts: e.ts }));
       return computeWeeklyScore(entries);
+    },
+  };
+
+  // ----------------------------
+  // FreeLeaderboardAPI — separate table (public.scores_free), daily only.
+  // Supabase is the single source of truth: no localStorage fallback, no
+  // wallet, no client-side rate limit. Reuses computeDailyScore() so paid
+  // and free stay in sync on the formula. The internal _fetchDailyRaw() is
+  // the only I/O choke point — swap it later (e.g. a materialized daily
+  // cache table) without touching public methods or render code.
+  // ----------------------------
+  const GAME_VERSION = "gameplay-v1";
+
+  const FreeLeaderboardAPI = {
+    // Submit resolves to { ok: boolean }. On any failure (no Supabase,
+    // network error, non-2xx) returns { ok: false }. Never writes locally
+    // and never retries — callers surface the failure to the user.
+    submit(record) {
+      if (!supabaseEnabled()) return Promise.resolve({ ok: false });
+      return sbFetch("scores_free", {
+        method: "POST",
+        prefer: "return=minimal",
+        body: JSON.stringify({
+          device_id:     record.device_id || null,
+          nickname:      record.nickname || "Anonymous",
+          score:         record.score,
+          copper:        record.copper,
+          diamonds:      record.diamonds,
+          combo_max:     record.combo_max,
+          frenzy_copper: record.frenzy_copper,
+          time_survived: record.timeSurvived,
+          died:          record.died,
+          map:           record.map,
+          mutator:       record.mutator || null,
+          game_version:  record.game_version || GAME_VERSION,
+        }),
+      })
+        .then(r => ({ ok: r.ok }))
+        .catch(() => ({ ok: false }));
+    },
+
+    // Single I/O choke point. Resolves to an array (possibly empty) on
+    // success. Rejects on any failure (no Supabase / network error /
+    // non-2xx / malformed body) so callers can distinguish an actually
+    // empty day from a fetch failure — no local fallback, ever.
+    _fetchDailyRaw() {
+      if (!supabaseEnabled()) return Promise.reject(new Error("supabase disabled"));
+      const url =
+        "scores_free?select=id,device_id,nickname,score,copper,diamonds,combo_max,frenzy_copper,time_survived,died,map,mutator,created_at" +
+        "&order=score.desc&limit=2000" +
+        `&created_at=gte.${encodeURIComponent(todayStartISO())}`;
+      return sbFetch(url)
+        .then(r => { if (!r.ok) throw new Error(r.status); return r.json(); })
+        .then(rows => {
+          if (!Array.isArray(rows)) throw new Error("bad response");
+          return rows.map(r => ({
+            id: r.id,
+            device_id: r.device_id || null,
+            nickname: r.nickname || "Anonymous",
+            score: r.score,
+            copper: r.copper,
+            diamonds: r.diamonds,
+            combo_max: r.combo_max,
+            frenzy_copper: r.frenzy_copper,
+            timeSurvived: r.time_survived,
+            died: r.died,
+            map: r.map,
+            mutator: r.mutator,
+            ts: new Date(r.created_at).getTime(),
+          }));
+        });
+    },
+
+    getEntries(period) {
+      // Free mode is daily-only. Any period other than "today" returns empty.
+      if (period !== "today") return Promise.resolve([]);
+      return this._fetchDailyRaw().then(rows =>
+        rows.slice().sort((a, b) => b.score - a.score).slice(0, 50)
+      );
+    },
+
+    getAllDailyEntries() {
+      return this._fetchDailyRaw().then(rows =>
+        rows.map(r => ({ nickname: r.nickname, score: r.score }))
+      );
+    },
+
+    // Aggregate on device_id. Rows without a device_id (legacy pre-
+    // migration) get a synthetic per-row key so each legacy row shows
+    // as its own single-run entry — no cross-nickname collision, no
+    // hidden merges with a claimed player who happens to share the
+    // same nickname string.
+    async getDailyLeaderboard() {
+      const rows = await this._fetchDailyRaw();
+      const byKey = new Map();
+      for (const r of rows) {
+        const key = r.device_id ? `dev:${r.device_id}` : `legacy:${r.id}`;
+        if (!byKey.has(key)) {
+          byKey.set(key, {
+            device_id: r.device_id || null,
+            nickname:  r.nickname,
+            scores:    [],
+            isLegacy:  !r.device_id,
+          });
+        }
+        byKey.get(key).scores.push(r.score);
+      }
+      const players = [];
+      for (const [, data] of byKey) {
+        players.push({
+          device_id: data.device_id,
+          nickname:  data.nickname,
+          isLegacy:  data.isLegacy,
+          ...computeDailyScore(data.scores),
+          totalRuns: data.scores.length,
+        });
+      }
+      players.sort((a, b) => b.dailyScore - a.dailyScore);
+      return players;
+    },
+
+    // Individual runs for one device, sorted by score desc — used by
+    // the modal's "My Runs" collapsible. Pulled from the same fetch as
+    // the leaderboard so we don't need a second round trip.
+    async getMyRunsToday(deviceId) {
+      if (!deviceId) return [];
+      const rows = await this._fetchDailyRaw();
+      return rows
+        .filter(r => r.device_id === deviceId)
+        .sort((a, b) => b.score - a.score);
+    },
+
+    // Highest single-run score today across all players. Used by the
+    // right-panel "Today's best" line. Cheaper than getDailyLeaderboard
+    // because we ask Supabase for a single row. Silently falls back to 0
+    // on any failure (matches paid's "-" empty display).
+    getBestDaily() {
+      if (!supabaseEnabled()) return Promise.resolve(0);
+      const url = `scores_free?select=score&order=score.desc&limit=1&created_at=gte.${encodeURIComponent(todayStartISO())}`;
+      return sbFetch(url)
+        .then(r => { if (!r.ok) throw new Error(r.status); return r.json(); })
+        .then(rows => (rows[0] ? rows[0].score : 0))
+        .catch(() => 0);
+    },
+
+    // Aggregate the current player's daily stats. Same shape as
+    // computeDailyScore so it plugs into the right-panel Daily
+    // Leaderboard section unchanged. Filters on device_id — an empty
+    // deviceId (pre-claim) returns a zeroed stats object.
+    async getPlayerDailyStats(deviceId) {
+      if (!deviceId) return computeDailyScore([]);
+      try {
+        const rows = await this._fetchDailyRaw();
+        const scores = rows
+          .filter(r => r.device_id === deviceId)
+          .map(r => r.score);
+        return computeDailyScore(scores);
+      } catch {
+        return computeDailyScore([]);
+      }
+    },
+  };
+
+  // ----------------------------
+  // FreePlayerAPI — persistent free-mode identity in public.free_players.
+  //   One row per device_id (PK). Nickname is permanent per device — no
+  //   rename path exists by design. all_time_copper / all_time_runs /
+  //   best_score are increment-only from the client; last_seen_at ticks
+  //   with each run. Row is created once at claim() and updated by
+  //   recordRun(). Submit/recordRun failures never touch identity.
+  // ----------------------------
+  const FreePlayerAPI = {
+    async get(deviceId) {
+      if (!supabaseEnabled() || !deviceId) return null;
+      const url = `free_players?device_id=eq.${encodeURIComponent(deviceId)}&select=device_id,nickname,all_time_copper,all_time_runs,best_score,last_seen_at,created_at`;
+      try {
+        const r = await sbFetch(url);
+        if (!r.ok) return null;
+        const rows = await r.json();
+        return Array.isArray(rows) && rows[0] ? rows[0] : null;
+      } catch { return null; }
+    },
+
+    // Returns { taken: boolean, ownerDeviceId?: string }. Case-
+    // insensitive via nickname_lower. taken=false on any network
+    // error — the subsequent INSERT will 409 if we guessed wrong,
+    // which is a cleaner failure than blocking the claim flow.
+    async isNicknameTaken(nickname) {
+      if (!supabaseEnabled()) return { taken: false };
+      const nl = String(nickname || "").trim().toLowerCase();
+      if (!nl) return { taken: false };
+      const url = `free_players?nickname_lower=eq.${encodeURIComponent(nl)}&select=device_id`;
+      try {
+        const r = await sbFetch(url);
+        if (!r.ok) return { taken: false };
+        const rows = await r.json();
+        if (Array.isArray(rows) && rows[0]) {
+          return { taken: true, ownerDeviceId: rows[0].device_id };
+        }
+        return { taken: false };
+      } catch { return { taken: false }; }
+    },
+
+    // INSERT one row. Caller SHOULD get() first and skip claim if the
+    // row exists. On UNIQUE conflict (409) returns
+    // { ok:false, reason:"Nickname already taken" }. seedCopper is
+    // used once during the legacy localStorage migration; ignored
+    // afterwards.
+    async claim(deviceId, nickname, opts) {
+      if (!supabaseEnabled()) return { ok: false, reason: "Backend unavailable" };
+      const nick = String(nickname || "").trim();
+      if (nick.length < 1 || nick.length > 20) return { ok: false, reason: "Invalid nickname" };
+      const seedCopper = Math.max(0, Number(opts && opts.seedCopper) || 0);
+      const payload = {
+        device_id:       deviceId,
+        nickname:        nick,
+        nickname_lower:  nick.toLowerCase(),
+        all_time_copper: seedCopper,
+        all_time_runs:   0,
+        best_score:      0,
+      };
+      try {
+        const r = await sbFetch("free_players", {
+          method: "POST",
+          prefer: "return=representation",
+          body: JSON.stringify(payload),
+        });
+        if (r.ok) {
+          const rows = await r.json().catch(() => []);
+          const row = Array.isArray(rows) ? rows[0] : rows;
+          return { ok: true, row: row || payload };
+        }
+        if (r.status === 409) return { ok: false, reason: "Nickname already taken" };
+        return { ok: false, reason: "Could not claim (server " + r.status + ")" };
+      } catch { return { ok: false, reason: "Network error" }; }
+    },
+
+    // Non-atomic increment: reads current, computes new totals, PATCHes.
+    // Never sends nickname / nickname_lower / device_id / created_at —
+    // those are immutable from the client by policy. best_score tracks
+    // the highest single-run score (not aggregated daily). Died runs
+    // don't count copper or best_score but still bump all_time_runs.
+    async recordRun(deviceId, opts) {
+      if (!supabaseEnabled() || !deviceId) return { ok: false };
+      const copperInc = Math.max(0, Number(opts && opts.copperInc) || 0);
+      const survived  = !!(opts && opts.survived);
+      const runScore  = Math.max(0, Number(opts && opts.score) || 0);
+      try {
+        const current = await this.get(deviceId);
+        if (!current) return { ok: false, reason: "Player not found" };
+        const nextCopper = (Number(current.all_time_copper) || 0) + (survived ? copperInc : 0);
+        const nextRuns   = (Number(current.all_time_runs)   || 0) + 1;
+        const nextBest   = Math.max(Number(current.best_score) || 0, survived ? runScore : 0);
+        const nowISO     = new Date().toISOString();
+        const r = await sbFetch(
+          `free_players?device_id=eq.${encodeURIComponent(deviceId)}`,
+          {
+            method: "PATCH",
+            prefer: "return=minimal",
+            body: JSON.stringify({
+              all_time_copper: nextCopper,
+              all_time_runs:   nextRuns,
+              best_score:      nextBest,
+              last_seen_at:    nowISO,
+              updated_at:      nowISO,
+            }),
+          }
+        );
+        return { ok: !!r.ok };
+      } catch { return { ok: false }; }
     },
   };
 
@@ -3219,6 +3638,45 @@ button:disabled { opacity: .5; cursor: not-allowed; }
   const elDiamondInfo = document.getElementById("diamondInfo");
   const elAllTimeCopper = document.getElementById("allTimeCopper");
   const elAllTimeRuns = document.getElementById("allTimeRuns");
+  const elFreeAllTimeCopper = document.getElementById("freeAllTimeCopper");
+  // Source of truth is free_players. Legacy localStorage is used only as
+  // a fallback when the row doesn't exist yet (pre-claim) or the fetch
+  // fails — never as the authoritative value once a claim has landed.
+  async function updateFreeAllTimeUI() {
+    if (!elFreeAllTimeCopper) return;
+    let deviceId = null;
+    try { deviceId = localStorage.getItem(FREE_DEVICE_ID_KEY); } catch {}
+    if (deviceId) {
+      try {
+        const row = await FreePlayerAPI.get(deviceId);
+        if (row) {
+          elFreeAllTimeCopper.textContent = String(row.all_time_copper || 0);
+          return;
+        }
+      } catch { /* fall through to legacy */ }
+    }
+    elFreeAllTimeCopper.textContent = String(getLegacyFreeAllTimeCopper());
+  }
+  updateFreeAllTimeUI();
+
+  const elFDLScore  = document.getElementById("fdlScore");
+  const elFDLBest3  = document.getElementById("fdlBest3");
+  const elFDLVolume = document.getElementById("fdlVolume");
+  const elFDLRuns   = document.getElementById("fdlRuns");
+  async function updateFreeLeaderboardUI() {
+    if (gameMode !== "free") return;
+    let deviceId = null;
+    try { deviceId = localStorage.getItem(FREE_DEVICE_ID_KEY); } catch {}
+    try {
+      const stats = deviceId
+        ? await FreeLeaderboardAPI.getPlayerDailyStats(deviceId)
+        : computeDailyScore([]);
+      if (elFDLScore)  elFDLScore.textContent  = String(stats.dailyScore);
+      if (elFDLBest3)  elFDLBest3.textContent  = String(stats.best3Sum);
+      if (elFDLVolume) elFDLVolume.textContent = "+" + String(stats.volumeBonus);
+      if (elFDLRuns)   elFDLRuns.textContent   = String(stats.totalRuns);
+    } catch { /* leave last-known values on failure */ }
+  }
   const elWLZone = document.getElementById("wlZone");
   const elMagStatus = document.getElementById("magStatus");
   const elSpdStatus = document.getElementById("spdStatus");
@@ -3233,10 +3691,15 @@ button:disabled { opacity: .5; cursor: not-allowed; }
 
   async function refreshGlobalBest() {
     try {
-      const [today, week] = await Promise.all([
-        LeaderboardAPI.getBestDaily(),
-        LeaderboardAPI.getBestWeekly(),
-      ]);
+      // Route by current gameMode so Free never leaks Paid's Today's Best
+      // and vice versa. Weekly stays paid-only (Free has no weekly).
+      const dailyPromise = gameMode === "free"
+        ? FreeLeaderboardAPI.getBestDaily()
+        : LeaderboardAPI.getBestDaily();
+      const weeklyPromise = gameMode === "free"
+        ? Promise.resolve(0)
+        : LeaderboardAPI.getBestWeekly();
+      const [today, week] = await Promise.all([dailyPromise, weeklyPromise]);
       if (elLBT) elLBT.textContent = today ? String(today) : "-";
       if (elLBW) elLBW.textContent = week  ? String(week)  : "-";
     } catch { /* leave as-is on failure */ }
@@ -3262,6 +3725,17 @@ button:disabled { opacity: .5; cursor: not-allowed; }
   const endScore = document.getElementById("endScore");
   const btnLB = document.getElementById("btnLB");
   const btnRedeem = document.getElementById("btnRedeem");
+
+  // Free-mode only: clicking outside the card dismisses the endscreen and
+  // enters idle state, which reveals the right-panel Play Again button.
+  // Paid keeps its explicit-button flow (no backdrop close).
+  overlay.addEventListener("click", (e) => {
+    if (gameMode !== "free") return;
+    if (e.target !== overlay) return; // click on card / children
+    if (!ended) return;               // ignore before run finishes
+    overlay.classList.remove("show");
+    setTimeout(() => { overlay.style.display = "none"; enterIdleState(); }, 300);
+  });
 
   // ----------------------------
   // Canvas
@@ -3336,6 +3810,7 @@ button:disabled { opacity: .5; cursor: not-allowed; }
   let copperScore = 0;     // score value (normal=1, risk tile=3)
   let riskCopperCollected = 0; // copper pieces picked up from risk tiles
   let riskCopperScore     = 0; // exact sum of val from risk-tile pickups
+  let frenzyCopperCollected = 0; // raw count picked up while frenzy is active
 
   // Rich copper tiles (DENSE_COPPER mutator). Subset of copperSet; each
   // rich pickup adds RICH_COPPER_COUNT to copperCollected and multiplies
@@ -3465,6 +3940,7 @@ button:disabled { opacity: .5; cursor: not-allowed; }
     copperScore = 0;
     riskCopperCollected = 0;
     riskCopperScore = 0;
+    frenzyCopperCollected = 0;
     richCopperSet.clear();
     comboCount = 0;
     maxComboCount = 0;
@@ -3739,7 +4215,7 @@ button:disabled { opacity: .5; cursor: not-allowed; }
       elGameplayToasts.removeChild(elGameplayToasts.firstChild);
     }
     const el = document.createElement("div");
-    el.className = "gp-toast" + (opts.large ? " gp-toast-large" : "");
+    el.className = "gp-toast" + (opts.large ? " gp-toast-large" : "") + (opts.medium ? " gp-toast-medium" : "");
     el.style.animationDuration = duration + "ms";
     const main = document.createElement("div");
     main.className = "gp-main";
@@ -3944,6 +4420,7 @@ button:disabled { opacity: .5; cursor: not-allowed; }
         riskCopperCollected += countInc;
         riskCopperScore     += val * countInc;
       }
+      if (frenzyActive) frenzyCopperCollected += countInc;
       registerCopperPickup(); // combo trigger fires ONCE per tile
       sfxPickupCopper();
       const color = isRich ? "#ffd766" : (onRisk ? "#ff6644" : "#ffb347");
@@ -4538,6 +5015,9 @@ button:disabled { opacity: .5; cursor: not-allowed; }
 
   function enterIdleState() {
     idleState = true;
+    btnStartNew.innerHTML = gameMode === "free"
+      ? "▶ Play Again"
+      : "▶ Start New Game";
     btnStartNew.style.display = "";
     updateLandingMutatorCard(); // refresh in case the UTC day rolled over
   }
@@ -4556,6 +5036,11 @@ button:disabled { opacity: .5; cursor: not-allowed; }
     running = false;
     updateMobileUI();
 
+    // Reset Submit button state each endscreen so a "Submitted ✓" left over
+    // from a previous free run doesn't leak into the next one.
+    btnLB.disabled = false;
+    btnLB.innerHTML = "\u{1F3C6} Submit Score";
+
     const redeem = computeRedeem();
     const lb = computeLeaderboardScore();
     const timeSurvived = Math.min(RUN_MS, now() - tStart) / 1000;
@@ -4563,7 +5048,8 @@ button:disabled { opacity: .5; cursor: not-allowed; }
     // Personal best check (uses cached value from last updateLeaderboardUI call)
     const isNewBest = lb.score > lbDailyBest && lb.score > 0;
 
-    // Track all-time stats (paid mode only — free is a demo, no persistence)
+    // Track all-time stats. Paid mirrors to Supabase; free is
+    // localStorage-only per browser (no wallet binding).
     if (gameMode === "paid") {
       persist.allTimeRuns += 1;
       if (!died) {
@@ -4578,6 +5064,26 @@ button:disabled { opacity: .5; cursor: not-allowed; }
           runCount:      persist.allTimeRuns,
           allTimeCopper: persist.allTimeCopper,
         });
+      }
+    } else if (gameMode === "free") {
+      // Free: push run to server-side counters via recordRun. Fire-and-
+      // report — a failure here does not touch identity or the endscreen
+      // submit flow; UI just shows the last known values until next
+      // successful update.
+      let deviceId = null;
+      try { deviceId = localStorage.getItem(FREE_DEVICE_ID_KEY); } catch {}
+      if (deviceId) {
+        FreePlayerAPI.recordRun(deviceId, {
+          copperInc: copperCollected,
+          survived:  !died,
+          score:     died ? 0 : lb.score,
+        }).finally(() => {
+          updateFreeAllTimeUI();
+          updateFreeLeaderboardUI();
+        });
+      } else {
+        updateFreeAllTimeUI();
+        updateFreeLeaderboardUI();
       }
     }
 
@@ -4627,17 +5133,19 @@ button:disabled { opacity: .5; cursor: not-allowed; }
 
     // Hint text
     if (gameMode === "free") {
-      endWarn.textContent = "Free demo \u00b7 Scores are not saved. Play with 0.01 SOL to compete on the leaderboard!";
-      endWarn.style.opacity = "0.75";
-      endWarn.style.color = "#ffcc66";
+      // Free endscreen keeps the copy minimal \u2014 the button label carries
+      // the intent ("\ud83c\udfc6 Submit Score"). No extra hint text.
+      endWarn.style.display = "none";
     } else if (totalDiam === 0) {
       endWarn.textContent = "No diamonds this run.";
       endWarn.style.opacity = "0.4";
       endWarn.style.color = "";
+      endWarn.style.display = "none";
     } else {
       endWarn.textContent = "Diamonds boost your score. Submit to Leaderboard or Redeem for coins.";
       endWarn.style.opacity = "";
       endWarn.style.color = "";
+      endWarn.style.display = "none";
     }
 
     // Show current nickname
@@ -4767,22 +5275,61 @@ button:disabled { opacity: .5; cursor: not-allowed; }
     endPay.textContent = String(redeem.payoutCoins);
 
     btnLB.onclick = async () => {
-      if (gameMode === "free") return; // defense-in-depth: free runs never submit
-      const diamSummary = diamondsCollected.map(d => d.id);
-      const record = {
-        nickname: getNickname() || "Anonymous",
-        wallet: walletPublicKey || null,
-        score: died ? 0 : lb.score,
-        copper: copperCollected,
-        diamonds: diamSummary,
-        timeSurvived: parseFloat(timeSurvived.toFixed(1)),
+      if (gameMode === "paid") {
+        const diamSummary = diamondsCollected.map(d => d.id);
+        const record = {
+          nickname: getNickname() || "Anonymous",
+          wallet: walletPublicKey || null,
+          score: died ? 0 : lb.score,
+          copper: copperCollected,
+          diamonds: diamSummary,
+          timeSurvived: parseFloat(timeSurvived.toFixed(1)),
+          died,
+          map: map.id,
+        };
+        await LeaderboardAPI.submit(record);
+        overlay.classList.remove("show");
+        setTimeout(() => { overlay.style.display = "none"; enterIdleState(); }, 300);
+        updateLeaderboardUI();
+        return;
+      }
+      // Free path — Supabase-only, no wallet, no local fallback.
+      const rawNick = (getNickname() || "").trim();
+      if (!rawNick || rawNick.toLowerCase() === "anonymous") {
+        pushToast("NICKNAME REQUIRED", "Enter a nickname on the landing page first.", "#ff6644", 2200);
+        return;
+      }
+      const freeRecord = {
+        device_id:     getDeviceId(),
+        nickname:      rawNick.slice(0, 20),
+        score:         died ? 0 : lb.score,
+        copper:        copperCollected,
+        diamonds:      diamondsCollected.length,
+        combo_max:     maxComboCount,
+        frenzy_copper: frenzyCopperCollected,
+        timeSurvived:  parseFloat(timeSurvived.toFixed(1)),
         died,
-        map: map.id,
+        map:           map.id,
+        mutator:       activeMutator ? (activeMutator.id || activeMutator.name || null) : null,
+        game_version:  GAME_VERSION,
       };
-      await LeaderboardAPI.submit(record);
-      overlay.classList.remove("show");
-      setTimeout(() => { overlay.style.display = "none"; enterIdleState(); }, 300);
-      updateLeaderboardUI();
+      btnLB.disabled = true;
+      const originalLabel = btnLB.textContent;
+      btnLB.textContent = "Submitting...";
+      const result = await FreeLeaderboardAPI.submit(freeRecord);
+      if (!result.ok) {
+        pushToast("LEADERBOARD UNAVAILABLE", "Please try again later.", "#ff6644", 2400);
+        btnLB.disabled = false;
+        btnLB.textContent = originalLabel;
+        return; // keep overlay open so the user can retry
+      }
+      // Success: keep the endscreen open so the player can review the
+      // stats. They dismiss by clicking outside the card (see the free
+      // backdrop-close handler); the right-panel button lets them restart.
+      btnLB.textContent = "Submitted ✓";
+      btnLB.disabled = true;
+      updateFreeLeaderboardUI();
+      refreshGlobalBest();
     };
   }
 
@@ -5653,6 +6200,73 @@ button:disabled { opacity: .5; cursor: not-allowed; }
     if (nicknameInputEl) saveNickname(nicknameInputEl.value);
     initAudio();
 
+    // Set only if the free branch detects a silent-override attempt. Emitted
+    // after resetRun() so it survives clearGameplayToasts().
+    let pendingLockedToast = null;
+
+    if (mode === "free") {
+      // Free: enforce a per-browser identity (device_id) and a
+      // permanent case-insensitive-unique nickname stored in
+      // free_players. If the device already has a claim, we lock the
+      // input to it and skip the claim step. On failure to claim we
+      // stay on the landing so the user can retry — identity is only
+      // considered established after a successful INSERT.
+      const deviceId = getDeviceId();
+      const existing = await FreePlayerAPI.get(deviceId);
+      if (existing) {
+        // Defensive: even if the input somehow shows a different string
+        // (edited before initFreeIdentityUI landed, or via DevTools), the
+        // device_id already owns a claim in free_players. Reset the input
+        // to the locked nickname so the run is attributed to the correct
+        // identity — never silently commit under whatever's in the box.
+        const typed = (nicknameInputEl && nicknameInputEl.value ? nicknameInputEl.value : "").trim();
+        const overrideAttempt = typed && typed.toLowerCase() !== existing.nickname.toLowerCase();
+        if (overrideAttempt && nicknameInputEl) nicknameInputEl.value = existing.nickname;
+        saveNickname(existing.nickname);
+        lockNicknameInput(existing.nickname);
+        setNicknameStatus("✓ Nickname locked to this browser", "ok");
+        // If the input was overridden, tell the user which identity the
+        // run will actually be attributed to. Queue for after resetRun()
+        // — resetRun calls clearGameplayToasts() so a toast pushed here
+        // would be wiped before the first frame.
+        if (overrideAttempt) {
+          pendingLockedToast = {
+            text: "Playing as " + existing.nickname,
+            sub: "This browser is locked to this nickname",
+          };
+        }
+      } else {
+        const desired = (nicknameInputEl && nicknameInputEl.value ? nicknameInputEl.value : "").trim();
+        if (!desired || desired.length < 2) {
+          setNicknameStatus("Enter a nickname (min 2 chars)", "error");
+          return;
+        }
+        if (!/^[\w\-.]+$/.test(desired)) {
+          setNicknameStatus("Only letters, numbers, - . _ allowed", "error");
+          return;
+        }
+        setNicknameStatus("Checking nickname...", "info");
+        const taken = await FreePlayerAPI.isNicknameTaken(desired);
+        if (taken.taken && taken.ownerDeviceId !== deviceId) {
+          setNicknameStatus("Nickname already taken", "error");
+          return;
+        }
+        // One-shot legacy migration: seed all_time_copper from the old
+        // localStorage key exactly once, on the first successful claim
+        // for this browser. The key itself is kept as a backup.
+        const seedCopper = isLegacyFreeCopperMigrated() ? 0 : getLegacyFreeAllTimeCopper();
+        const claimRes = await FreePlayerAPI.claim(deviceId, desired, { seedCopper });
+        if (!claimRes.ok) {
+          setNicknameStatus(claimRes.reason || "Could not claim", "error");
+          return;
+        }
+        markLegacyFreeCopperMigrated();
+        saveNickname(claimRes.row.nickname);
+        lockNicknameInput(claimRes.row.nickname);
+        setNicknameStatus("✓ Nickname claimed · locked to this browser", "ok");
+      }
+    }
+
     if (mode === "paid") {
       // Enforce wallet-bound unique nickname before payment
       if (!claimedNickname) {
@@ -5684,7 +6298,19 @@ button:disabled { opacity: .5; cursor: not-allowed; }
     landingEl.classList.add("hidden");
     wrapEl.style.display = "";
     if (mode === "paid") updateLeaderboardUI();
+    if (mode === "free") { updateFreeLeaderboardUI(); refreshGlobalBest(); }
     resetRun();
+    // Emit here (post-resetRun) so clearGameplayToasts() doesn't wipe it.
+    if (pendingLockedToast) {
+      pushToast(pendingLockedToast.text, pendingLockedToast.sub, "#7ee787", 4500, { medium: true });
+    }
+    // Persistent identity badge: only free mode has device-locked identity;
+    // paid mode is wallet-scoped and already surfaced in the wallet panel.
+    if (mode === "free") {
+      showLockedNicknameBadge(getNickname());
+    } else {
+      hideLockedNicknameBadge();
+    }
     draw();
     requestAnimationFrame(loop);
   }
@@ -5722,23 +6348,52 @@ button:disabled { opacity: .5; cursor: not-allowed; }
   const lbTableHeader = document.getElementById("lb-table-header");
 
   async function renderLBEntries() {
+    // Free mode reuses this modal but is daily-only; guard rail if a
+    // week/all tab is somehow activated (CSS hides them, but not by JS).
+    const isFree = gameMode === "free";
+    if (isFree && lbCurrentPeriod !== "today") {
+      lbEntries.innerHTML = '<div class="lb-empty">Free Leaderboard is daily only.</div>';
+      return;
+    }
+    const lbAPI = isFree ? FreeLeaderboardAPI : LeaderboardAPI;
+
     if (lbCurrentPeriod === "today") {
       // Daily leaderboard: aggregated per player + my individual runs
       lbTableHeader.innerHTML = "<span>#</span><span>Player</span><span>Daily</span><span>Best3</span><span>Bonus</span><span>Runs</span>";
-      const players = await LeaderboardAPI.getDailyLeaderboard();
+      let players;
+      try {
+        players = await lbAPI.getDailyLeaderboard();
+      } catch {
+        // Free path signals fetch failures by rejecting; surface them
+        // as an explicit unavailable state instead of a misleading empty.
+        lbEntries.innerHTML = '<div class="lb-empty">Free Leaderboard temporarily unavailable.</div>';
+        return;
+      }
       if (players.length === 0) {
         lbEntries.innerHTML = '<div class="lb-empty">No runs yet today.</div>';
         return;
       }
       const myNick = getNickname() || "Anonymous";
+      const myDeviceId = isFree
+        ? (function () { try { return localStorage.getItem(FREE_DEVICE_ID_KEY); } catch { return null; } })()
+        : null;
       const cutoffIdx = Math.max(0, Math.ceil(players.length * 0.25) - 1);
       const rankClass = ["gold", "silver", "bronze"];
 
-      // Get current player's individual runs for today (sorted desc)
+      // Get current player's individual runs for today (sorted desc).
+      // Paid reads localStorage cache; free hits Supabase (no local cache).
+      // If the free fetch fails here, silently skip "My Runs" — the main
+      // leaderboard already rendered from a successful fetch above.
       const tk = todayKey();
-      const myRuns = loadLB().entries
-        .filter(e => tsToDateKey(e.ts) === tk && (e.nickname || "Anonymous") === myNick)
-        .sort((a, b) => b.score - a.score);
+      let myRuns;
+      if (isFree) {
+        try { myRuns = myDeviceId ? await FreeLeaderboardAPI.getMyRunsToday(myDeviceId) : []; }
+        catch { myRuns = []; }
+      } else {
+        myRuns = loadLB().entries
+          .filter(e => tsToDateKey(e.ts) === tk && (e.nickname || "Anonymous") === myNick)
+          .sort((a, b) => b.score - a.score);
+      }
 
       let html = "";
       for (let i = 0; i < players.length; i++) {
@@ -5747,7 +6402,9 @@ button:disabled { opacity: .5; cursor: not-allowed; }
         const medal = i === 0 ? "&#127947;" : i === 1 ? "&#129352;" : i === 2 ? "&#129353;" : String(i + 1);
         const nick = p.nickname.slice(0, 16);
         const inTop = i <= cutoffIdx ? " style=\"color:#7ee787;\"" : "";
-        const isMe = p.nickname === myNick;
+        const isMe = isFree
+          ? (!!myDeviceId && p.device_id === myDeviceId)
+          : (p.nickname === myNick);
 
         html += `<div class="lb-row${isMe ? " lb-me" : ""}">
           <span class="lb-rank ${rc}">${medal}</span>
@@ -5876,6 +6533,12 @@ button:disabled { opacity: .5; cursor: not-allowed; }
   }
 
   function openLBModal() {
+    // Free mode is daily-only; snap to Today tab in case the user last
+    // viewed a paid week/all tab before switching modes.
+    if (gameMode === "free" && lbCurrentPeriod !== "today") {
+      lbCurrentPeriod = "today";
+      lbTabs.forEach(t => t.classList.toggle("active", t.dataset.period === "today"));
+    }
     lbOverlay.style.display = "flex";
     lbOverlay.classList.remove("show");
     requestAnimationFrame(() => requestAnimationFrame(() => lbOverlay.classList.add("show")));
@@ -6108,6 +6771,41 @@ button:disabled { opacity: .5; cursor: not-allowed; }
     nicknameInputEl.readOnly = false;
     nicknameInputEl.classList.remove("locked");
   }
+
+  // Persistent free-mode identity badge (top-left). Shown from the first
+  // free-mode Play through the whole session so the player always sees
+  // which nickname the run is attributed to.
+  const lockedNicknameBadgeEl = document.getElementById("lockedNicknameBadge");
+  const lnbNameEl = document.getElementById("lnbName");
+  function showLockedNicknameBadge(nickname) {
+    if (!lockedNicknameBadgeEl || !lnbNameEl) return;
+    lnbNameEl.textContent = nickname || "";
+    lockedNicknameBadgeEl.classList.add("visible");
+  }
+  function hideLockedNicknameBadge() {
+    if (!lockedNicknameBadgeEl) return;
+    lockedNicknameBadgeEl.classList.remove("visible");
+  }
+
+  // On landing load, if this browser already has a device_id + a claim in
+  // free_players, pre-populate + readonly-lock the nickname input and show
+  // a persistent "locked" status so the user cannot type a different name
+  // and be silently rerouted to the locked identity when they hit Play.
+  async function initFreeIdentityUI() {
+    if (!nicknameInputEl) return;
+    let deviceId = null;
+    try { deviceId = localStorage.getItem(FREE_DEVICE_ID_KEY); } catch {}
+    if (!deviceId) return;
+    if (!supabaseEnabled()) return;
+    try {
+      const row = await FreePlayerAPI.get(deviceId);
+      if (!row || !row.nickname) return;
+      saveNickname(row.nickname);
+      lockNicknameInput(row.nickname);
+      setNicknameStatus("✓ Nickname locked to this browser", "ok");
+    } catch { /* silent — startGameFromLanding will retry on Play */ }
+  }
+  initFreeIdentityUI();
 
   async function onWalletConnected(publicKey) {
     walletPublicKey = publicKey.toString();
