@@ -4067,22 +4067,31 @@ button:disabled { opacity: .5; cursor: not-allowed; }
       saveState();
     }
 
-    // Free mode: rotates through FREE_MAPS (1 -> 2 -> 3 -> 1 ...), default spawns.
+    // Free mode: same rotation shape as paid, only the pool and cadence
+    // differ. Each map is played once (runsPerMap=1) — swap on every
+    // run — and every full pass through FREE_MAPS advances the spawn
+    // corner via the same CORNER_ROTATION paid uses.
     // Paid mode: each map played 2x; every full cycle through MAPS advances the spawn corner.
     let playerSpawn, ghostSpawn;
     if (gameMode === "free") {
       // Dev override takes precedence — when the panel picked a map,
-      // every Free run uses it. Public players always hit the rotation.
+      // every Free run uses it (with the map's own default spawns so
+      // dev testing isn't affected by rotation state).
       const forcedId = devForcedMapId();
       if (forcedId) {
         const all = [...FREE_MAPS, ...MAPS];
         map = all.find(m => m.id === forcedId) || FREE_MAPS[0];
+        playerSpawn = map.playerStart;
+        ghostSpawn  = map.ghostStart;
       } else {
-        const mapIdx = freeRunCount % FREE_MAPS.length;
+        const runsPerMap   = 1;
+        const runsPerCycle = runsPerMap * FREE_MAPS.length;
+        const mapIdx    = Math.floor(freeRunCount / runsPerMap) % FREE_MAPS.length;
+        const cornerIdx = Math.floor(freeRunCount / runsPerCycle) % CORNER_ROTATION.length;
         map = FREE_MAPS[mapIdx];
+        playerSpawn = CORNER_ROTATION[cornerIdx].player;
+        ghostSpawn  = CORNER_ROTATION[cornerIdx].ghost;
       }
-      playerSpawn = map.playerStart;
-      ghostSpawn  = map.ghostStart;
       freeRunCount++;
     } else {
       const runsPerMap   = 2;
@@ -6447,6 +6456,13 @@ button:disabled { opacity: .5; cursor: not-allowed; }
       // the row we already have from the claim/existing check above so we
       // don't fire a second GET against free_players for the same event.
       updateFreeStatsUI(effectiveRow);
+      // Same idea as paid's onWalletConnected: seed the rotation counter
+      // from the server's authoritative run count so map + spawn corner
+      // continue where the player left off — even across browser
+      // reloads. A fresh claim gives 0, which starts at map[0]/corner 0.
+      if (effectiveRow) {
+        freeRunCount = Number(effectiveRow.all_time_runs) || 0;
+      }
     }
 
     if (mode === "paid") {
@@ -7157,6 +7173,11 @@ button:disabled { opacity: .5; cursor: not-allowed; }
       saveNickname(row.nickname);
       lockNicknameInput(row.nickname);
       setNicknameStatus("✓ Nickname locked to this browser", "ok");
+      // Hydrate the map/corner rotation counter from server so a
+      // returning player keeps advancing through the pool instead of
+      // restarting at map 0 on every reload — mirrors how paid mode
+      // hydrates runCount in onWalletConnected.
+      freeRunCount = Number(row.all_time_runs) || 0;
     } catch { /* silent — startGameFromLanding will retry on Play */ }
   }
   initFreeIdentityUI();
