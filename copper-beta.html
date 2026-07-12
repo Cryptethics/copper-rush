@@ -2924,10 +2924,15 @@ button:disabled { opacity: .5; cursor: not-allowed; }
             device_id: r.device_id || null,
             nickname:  r.nickname,
             scores:    [],
+            runs:      [],
             isLegacy:  !r.device_id,
           });
         }
         byKey.get(key).scores.push(r.score);
+        // Same rows the aggregation already walks — kept as-is so the
+        // modal's dropdown can list any player's day without a second
+        // fetch. computeDailyScore still consumes just `scores`.
+        byKey.get(key).runs.push(r);
       }
       const players = [];
       for (const [, data] of byKey) {
@@ -2935,6 +2940,7 @@ button:disabled { opacity: .5; cursor: not-allowed; }
           device_id: data.device_id,
           nickname:  data.nickname,
           isLegacy:  data.isLegacy,
+          runs:      data.runs.slice().sort((a, b) => b.score - a.score),
           ...computeDailyScore(data.scores),
           totalRuns: data.scores.length,
         });
@@ -6364,6 +6370,10 @@ button:disabled { opacity: .5; cursor: not-allowed; }
     const d = new Date(ts);
     return `${String(d.getDate()).padStart(2,"0")}/${String(d.getMonth()+1).padStart(2,"0")}`;
   }
+  function formatHHMM(ts) {
+    const d = new Date(ts);
+    return `${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}`;
+  }
 
   const lbTableHeader = document.getElementById("lb-table-header");
 
@@ -6400,16 +6410,14 @@ button:disabled { opacity: .5; cursor: not-allowed; }
       const cutoffIdx = Math.max(0, Math.ceil(players.length * 0.25) - 1);
       const rankClass = ["gold", "silver", "bronze"];
 
-      // Get current player's individual runs for today (sorted desc).
-      // Paid reads localStorage cache; free hits Supabase (no local cache).
-      // If the free fetch fails here, silently skip "My Runs" — the main
-      // leaderboard already rendered from a successful fetch above.
+      // Paid still uses its localStorage individual-runs cache for the
+      // "My Runs" collapsible under the current player's row. Free path
+      // reuses p.runs (bundled by getDailyLeaderboard from the same
+      // _fetchDailyRaw) for every player, so no second Supabase GET is
+      // fired here or at click time.
       const tk = todayKey();
-      let myRuns;
-      if (isFree) {
-        try { myRuns = myDeviceId ? await FreeLeaderboardAPI.getMyRunsToday(myDeviceId) : []; }
-        catch { myRuns = []; }
-      } else {
+      let myRuns = [];
+      if (!isFree) {
         myRuns = loadLB().entries
           .filter(e => tsToDateKey(e.ts) === tk && (e.nickname || "Anonymous") === myNick)
           .sort((a, b) => b.score - a.score);
@@ -6435,7 +6443,43 @@ button:disabled { opacity: .5; cursor: not-allowed; }
           <span class="lb-date-val">${p.runsUsed}</span>
         </div>`;
 
-        // Show my individual runs under my row (collapsible)
+        if (isFree) {
+          // Same dropdown pattern as the paid isMe case, but shown for
+          // every free player using p.runs. Sub-row layout, order, and
+          // columns are unchanged; only the "Run #N" text now carries
+          // the run's HH:MM timestamp and diamond count.
+          const runs = p.runs || [];
+          if (runs.length > 0) {
+            const togId = `fdlRuns_${i}`;
+            const togLabel = isMe ? `My Runs (${runs.length})` : `Runs (${runs.length})`;
+            html += `<div class="lb-runs-toggle" onclick="var el=document.getElementById('${togId}');el.classList.toggle('collapsed');this.querySelector('.dd-arrow').classList.toggle('open');">
+              <span class="dd-arrow">&#9654;</span> ${togLabel}
+            </div>`;
+            html += `<div class="lb-runs-container collapsed" id="${togId}">`;
+            for (let j = 0; j < runs.length; j++) {
+              const r = runs[j];
+              const timeStr = r.timeSurvived != null ? r.timeSurvived.toFixed(1) + "s" : "-";
+              const inBest3 = j < 3;
+              const label = inBest3 ? "&#9733;" : "&#9679;";
+              const tsLbl = r.ts ? formatHHMM(r.ts) : "-";
+              const diamCount = Array.isArray(r.diamonds)
+                ? r.diamonds.length
+                : (Number(r.diamonds) || 0);
+              html += `<div class="lb-run-sub">
+                <span style="text-align:center;${inBest3 ? "color:#ffcc66;" : ""}">${label}</span>
+                <span>Run #${j + 1} &middot; ${tsLbl}</span>
+                <span class="mono" style="${inBest3 ? "color:#ffcc66;font-weight:600;" : ""}">${r.score}</span>
+                <span class="mono">&#9874; ${r.copper ?? "-"} &middot; &#128142; x${diamCount}</span>
+                <span>${timeStr}</span>
+                <span>${r.died ? "&#128128;" : "&#9989;"}</span>
+              </div>`;
+            }
+            html += '</div>';
+          }
+          continue;
+        }
+
+        // Paid path — original behavior preserved.
         if (isMe && myRuns.length > 0) {
           const togId = "dlRunsToggle";
           html += `<div class="lb-runs-toggle" onclick="var el=document.getElementById('${togId}');el.classList.toggle('collapsed');this.querySelector('.dd-arrow').classList.toggle('open');">
