@@ -1962,9 +1962,9 @@ button:disabled { opacity: .5; cursor: not-allowed; }
       </div>
       <div class="lb-tabs">
         <button class="lb-tab active" data-period="today">Today</button>
+        <button class="lb-tab" data-period="week">This Week</button>
         <button class="lb-tab" data-period="allcopper">All-Time Copper</button>
         <button class="lb-tab" data-period="bestscores">Best Scores</button>
-        <button class="lb-tab" data-period="week">This Week</button>
         <button class="lb-tab" data-period="all">All Time</button>
       </div>
       <div id="lb-body">
@@ -5507,11 +5507,11 @@ button:disabled { opacity: .5; cursor: not-allowed; }
         btnLB.textContent = originalLabel;
         return; // keep overlay open so the user can retry
       }
-      // Success: keep the endscreen open so the player can review the
-      // stats. They dismiss by clicking outside the card (see the free
-      // backdrop-close handler); the right-panel button lets them restart.
-      btnLB.textContent = "Submitted ✓";
-      btnLB.disabled = true;
+      // Success: dismiss the endscreen the same way paid does — fade
+      // out the overlay, then hand off to enterIdleState so the player
+      // lands back on the main screen ready to Play Again.
+      overlay.classList.remove("show");
+      setTimeout(() => { overlay.style.display = "none"; enterIdleState(); }, 300);
       updateFreeLeaderboardUI();
       refreshGlobalBest();
     };
