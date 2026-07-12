@@ -1092,6 +1092,11 @@ button:disabled { opacity: .5; cursor: not-allowed; }
     body.free-mode .lb-tab[data-period="all"] {
       display: none !important;
     }
+    /* Paid mode never sees the free-only lifetime tabs. */
+    body:not(.free-mode) .lb-tab[data-period="allcopper"],
+    body:not(.free-mode) .lb-tab[data-period="bestscores"] {
+      display: none !important;
+    }
     /* Play Again on the endscreen is retired; restart is via the right-panel
        #btnStartNew (labeled "Play Again" in free, "Start New Game" in paid). */
     #btnPlayAgain { display: none !important; }
@@ -1587,6 +1592,14 @@ button:disabled { opacity: .5; cursor: not-allowed; }
       border-radius: 6px;
       margin: 2px 0;
     }
+    /* Free lifetime tabs: subtle gold highlight for #1. Placed after
+       .lb-me so it wins when the current player is also #1. */
+    .lb-row.lb-first {
+      background: rgba(255,215,0,0.06);
+      border: 1px solid rgba(255,215,0,0.22);
+      border-radius: 6px;
+      margin: 2px 0;
+    }
 
     /* Individual run sub-rows under player's daily row */
     .lb-run-sub {
@@ -1949,6 +1962,8 @@ button:disabled { opacity: .5; cursor: not-allowed; }
       </div>
       <div class="lb-tabs">
         <button class="lb-tab active" data-period="today">Today</button>
+        <button class="lb-tab" data-period="allcopper">All-Time Copper</button>
+        <button class="lb-tab" data-period="bestscores">Best Scores</button>
         <button class="lb-tab" data-period="week">This Week</button>
         <button class="lb-tab" data-period="all">All Time</button>
       </div>
@@ -2988,6 +3003,71 @@ button:disabled { opacity: .5; cursor: not-allowed; }
       } catch {
         return computeDailyScore([]);
       }
+    },
+
+    // Snapshot of every claimed player from free_players. Feeds the
+    // All-Time Copper and Best Scores tabs. A single promise is cached
+    // so switching between those tabs never re-fetches; openLBModal
+    // clears the cache so each modal session sees fresh data. The row
+    // shape is normalized (numeric coercion) so downstream sorts don't
+    // trip on a string leaking through.
+    _freePlayersPromise: null,
+    getAllPlayers() {
+      if (this._freePlayersPromise) return this._freePlayersPromise;
+      if (!supabaseEnabled()) {
+        this._freePlayersPromise = Promise.reject(new Error("supabase disabled"));
+        return this._freePlayersPromise;
+      }
+      const url = "free_players?select=device_id,nickname,all_time_copper,all_time_runs,best_score&limit=1000";
+      this._freePlayersPromise = sbFetch(url)
+        .then(r => { if (!r.ok) throw new Error(r.status); return r.json(); })
+        .then(rows => {
+          if (!Array.isArray(rows)) throw new Error("bad response");
+          return rows.map(row => ({
+            device_id:       row.device_id,
+            nickname:        row.nickname || "Anonymous",
+            all_time_copper: Number(row.all_time_copper) || 0,
+            all_time_runs:   Number(row.all_time_runs)   || 0,
+            best_score:      Number(row.best_score)      || 0,
+          }));
+        });
+      // Drop the cached promise on rejection so a retry can actually
+      // re-fetch instead of forever replaying the same failure.
+      this._freePlayersPromise.catch(() => { this._freePlayersPromise = null; });
+      return this._freePlayersPromise;
+    },
+
+    // Best single run per device from scores_free. Fires once, cached
+    // like getAllPlayers. Used by the Best Scores tab to show the
+    // copper collected IN that peak run (not the lifetime total).
+    // Server orders by score DESC so we only need to keep the first row
+    // encountered per device_id.
+    _bestRunPromise: null,
+    getBestRunPerDevice() {
+      if (this._bestRunPromise) return this._bestRunPromise;
+      if (!supabaseEnabled()) {
+        this._bestRunPromise = Promise.reject(new Error("supabase disabled"));
+        return this._bestRunPromise;
+      }
+      const url = "scores_free?select=device_id,score,copper&order=score.desc&limit=2000";
+      this._bestRunPromise = sbFetch(url)
+        .then(r => { if (!r.ok) throw new Error(r.status); return r.json(); })
+        .then(rows => {
+          if (!Array.isArray(rows)) throw new Error("bad response");
+          const map = new Map();
+          for (const r of rows) {
+            if (!r.device_id) continue;
+            if (!map.has(r.device_id)) {
+              map.set(r.device_id, {
+                score:  Number(r.score)  || 0,
+                copper: Number(r.copper) || 0,
+              });
+            }
+          }
+          return map;
+        });
+      this._bestRunPromise.catch(() => { this._bestRunPromise = null; });
+      return this._bestRunPromise;
     },
   };
 
@@ -6378,14 +6458,93 @@ button:disabled { opacity: .5; cursor: not-allowed; }
   const lbTableHeader = document.getElementById("lb-table-header");
 
   async function renderLBEntries() {
-    // Free mode reuses this modal but is daily-only; guard rail if a
-    // week/all tab is somehow activated (CSS hides them, but not by JS).
+    // Free mode gets today + two lifetime tabs (allcopper, bestscores);
+    // paid gets today + week + all. CSS hides invalid tabs, but a JS
+    // guard keeps the render sane if lbCurrentPeriod ever slips through.
     const isFree = gameMode === "free";
-    if (isFree && lbCurrentPeriod !== "today") {
+    const freeOnlyPeriod = lbCurrentPeriod === "allcopper" || lbCurrentPeriod === "bestscores";
+    if (isFree && !(lbCurrentPeriod === "today" || freeOnlyPeriod)) {
       lbEntries.innerHTML = '<div class="lb-empty">Free Leaderboard is daily only.</div>';
       return;
     }
+    if (!isFree && freeOnlyPeriod) {
+      lbEntries.innerHTML = '<div class="lb-empty">Not available in paid mode.</div>';
+      return;
+    }
     const lbAPI = isFree ? FreeLeaderboardAPI : LeaderboardAPI;
+
+    // Free lifetime tabs use a 4-column layout (# / Player / stat1 /
+    // stat2); today/week/all keep the shared class-level grid. Override
+    // inline and clear on the way out so today's next render doesn't
+    // inherit the lifetime layout.
+    if (freeOnlyPeriod) {
+      lbTableHeader.style.gridTemplateColumns = "24px 1fr 90px 90px";
+    } else {
+      lbTableHeader.style.gridTemplateColumns = "";
+    }
+
+    if (freeOnlyPeriod) {
+      // Both lifetime tabs share the free_players snapshot; Best Scores
+      // additionally pulls the peak-run-per-device from scores_free so
+      // its Copper column shows what was collected in THAT run rather
+      // than the lifetime total. Cached promises → switching tabs never
+      // re-fetches within a single modal session.
+      const isAllCopper = lbCurrentPeriod === "allcopper";
+      const sortKey     = isAllCopper ? "all_time_copper" : "best_score";
+      lbTableHeader.innerHTML = isAllCopper
+        ? "<span>#</span><span>Player</span><span>Copper</span><span>Runs</span>"
+        : "<span>#</span><span>Player</span><span>Best</span><span>Copper</span>";
+
+      let rows, bestRuns;
+      try {
+        if (isAllCopper) {
+          rows = await FreeLeaderboardAPI.getAllPlayers();
+        } else {
+          [rows, bestRuns] = await Promise.all([
+            FreeLeaderboardAPI.getAllPlayers(),
+            FreeLeaderboardAPI.getBestRunPerDevice(),
+          ]);
+        }
+      } catch {
+        lbEntries.innerHTML = '<div class="lb-empty">Free Leaderboard temporarily unavailable.</div>';
+        return;
+      }
+      const players = rows.slice().sort((a, b) => b[sortKey] - a[sortKey]).slice(0, 100);
+      if (players.length === 0) {
+        lbEntries.innerHTML = '<div class="lb-empty">No players yet.</div>';
+        return;
+      }
+      const myDeviceId = (function () { try { return localStorage.getItem(FREE_DEVICE_ID_KEY); } catch { return null; } })();
+      const rankClass = ["gold", "silver", "bronze"];
+      const gridCols = "24px 1fr 90px 90px";
+
+      let html = "";
+      for (let i = 0; i < players.length; i++) {
+        const p = players[i];
+        const rc = rankClass[i] || "";
+        const medal = i === 0 ? "&#127947;" : i === 1 ? "&#129352;" : i === 2 ? "&#129353;" : String(i + 1);
+        const nick = p.nickname.slice(0, 16);
+        const isMe = !!myDeviceId && p.device_id === myDeviceId;
+        let colA, colB;
+        if (isAllCopper) {
+          colA = p.all_time_copper;
+          colB = p.all_time_runs;
+        } else {
+          colA = p.best_score;
+          const run = bestRuns.get(p.device_id);
+          colB = run ? run.copper : "-";
+        }
+        const isFirst = i === 0;
+        html += `<div class="lb-row${isMe ? " lb-me" : ""}${isFirst ? " lb-first" : ""}" style="grid-template-columns: ${gridCols};">
+          <span class="lb-rank ${rc}">${medal}</span>
+          <span class="lb-nick" title="${nick}">${nick}${isMe ? " (you)" : ""}</span>
+          <span class="lb-score-val mono">${colA}</span>
+          <span class="lb-copper-val mono">${colB}</span>
+        </div>`;
+      }
+      lbEntries.innerHTML = html;
+      return;
+    }
 
     if (lbCurrentPeriod === "today") {
       // Daily leaderboard: aggregated per player + my individual runs
@@ -6597,12 +6756,20 @@ button:disabled { opacity: .5; cursor: not-allowed; }
   }
 
   function openLBModal() {
-    // Free mode is daily-only; snap to Today tab in case the user last
-    // viewed a paid week/all tab before switching modes.
-    if (gameMode === "free" && lbCurrentPeriod !== "today") {
+    // If the last-viewed period isn't valid for the current mode, snap
+    // back to Today. Free has today + two lifetime tabs; paid has today
+    // + week + all. Any cross-mode leftover falls through to today.
+    const freePeriods = ["today", "allcopper", "bestscores"];
+    const paidPeriods = ["today", "week", "all"];
+    const valid = gameMode === "free" ? freePeriods : paidPeriods;
+    if (!valid.includes(lbCurrentPeriod)) {
       lbCurrentPeriod = "today";
       lbTabs.forEach(t => t.classList.toggle("active", t.dataset.period === "today"));
     }
+    // Invalidate lifetime snapshot caches so a new modal open pulls
+    // fresh numbers instead of serving stale ones.
+    FreeLeaderboardAPI._freePlayersPromise = null;
+    FreeLeaderboardAPI._bestRunPromise     = null;
     lbOverlay.style.display = "flex";
     lbOverlay.classList.remove("show");
     requestAnimationFrame(() => requestAnimationFrame(() => lbOverlay.classList.add("show")));
