@@ -1087,8 +1087,8 @@ button:disabled { opacity: .5; cursor: not-allowed; }
     body.free-mode #endWeeklyDetails {
       display: none !important;
     }
-    /* Free mode uses the same leaderboard modal — hide paid-only tabs. */
-    body.free-mode .lb-tab[data-period="week"],
+    /* Free mode uses the same leaderboard modal — hide paid-only tabs
+       (All Time is still paid-only; This Week is enabled for Free). */
     body.free-mode .lb-tab[data-period="all"] {
       display: none !important;
     }
@@ -3035,6 +3035,82 @@ button:disabled { opacity: .5; cursor: not-allowed; }
       // re-fetch instead of forever replaying the same failure.
       this._freePlayersPromise.catch(() => { this._freePlayersPromise = null; });
       return this._freePlayersPromise;
+    },
+
+    // Weekly aggregation: fetch this week's scores_free rows, group by
+    // device (legacy rows keep their own synthetic key so each shows up
+    // as its own single-run "player" matching today's behavior), then
+    // for every player build a per-day map and call computeDailyScore
+    // on each day's scores. WeeklyScore = sum of dailyScores. The
+    // dayBreakdown array carries the per-day scores for the dropdown.
+    // Cached like the other lifetime fetches.
+    _weeklyPromise: null,
+    getWeeklyLeaderboard() {
+      if (this._weeklyPromise) return this._weeklyPromise;
+      if (!supabaseEnabled()) {
+        this._weeklyPromise = Promise.reject(new Error("supabase disabled"));
+        return this._weeklyPromise;
+      }
+      const url = "scores_free?select=id,device_id,nickname,score,created_at" +
+                  "&order=created_at.desc&limit=5000" +
+                  `&created_at=gte.${encodeURIComponent(weekStartISO())}`;
+      this._weeklyPromise = sbFetch(url)
+        .then(r => { if (!r.ok) throw new Error(r.status); return r.json(); })
+        .then(rows => {
+          if (!Array.isArray(rows)) throw new Error("bad response");
+          const byPlayer = new Map();
+          for (const r of rows) {
+            const key = r.device_id ? `dev:${r.device_id}` : `legacy:${r.id}`;
+            const dayKey = tsToDateKey(new Date(r.created_at).getTime());
+            if (!byPlayer.has(key)) {
+              byPlayer.set(key, {
+                device_id: r.device_id || null,
+                nickname:  r.nickname || "Anonymous",
+                isLegacy:  !r.device_id,
+                days:      new Map(),
+                totalRuns: 0,
+              });
+            }
+            const data = byPlayer.get(key);
+            if (!data.days.has(dayKey)) data.days.set(dayKey, []);
+            data.days.get(dayKey).push(Number(r.score) || 0);
+            data.totalRuns++;
+          }
+          const players = [];
+          for (const [, data] of byPlayer) {
+            const dayBreakdown = [];
+            let weeklyScore = 0;
+            for (const [dayKey, scores] of data.days) {
+              const daily = computeDailyScore(scores);
+              weeklyScore += daily.dailyScore;
+              // dayKey is "YYYY-MM-DD"; construct as local so the
+              // weekday name matches the day the player actually played.
+              const [yy, mm, dd] = dayKey.split("-").map(Number);
+              const dt = new Date(yy, mm - 1, dd);
+              const dayName = dt.toLocaleDateString("en-US", { weekday: "long" });
+              dayBreakdown.push({
+                dayKey,
+                dayName,
+                dailyScore: daily.dailyScore,
+                runs:       scores.length,
+              });
+            }
+            dayBreakdown.sort((a, b) => a.dayKey.localeCompare(b.dayKey));
+            players.push({
+              device_id:  data.device_id,
+              nickname:   data.nickname,
+              isLegacy:   data.isLegacy,
+              weeklyScore,
+              daysPlayed: data.days.size,
+              totalRuns:  data.totalRuns,
+              dayBreakdown,
+            });
+          }
+          players.sort((a, b) => b.weeklyScore - a.weeklyScore);
+          return players;
+        });
+      this._weeklyPromise.catch(() => { this._weeklyPromise = null; });
+      return this._weeklyPromise;
     },
 
     // Best single run per device from scores_free. Fires once, cached
@@ -6663,6 +6739,52 @@ button:disabled { opacity: .5; cursor: not-allowed; }
         }
       }
       lbEntries.innerHTML = html;
+    } else if (lbCurrentPeriod === "week" && isFree) {
+      // Free weekly: WeeklyScore = sum of daily computeDailyScore() for
+      // each day the player played this week. Grouped by device_id;
+      // legacy rows without device_id each remain their own single-row
+      // "player" so no cross-nickname merge sneaks in. Header shows only
+      // Player / Total Score / Days Played / Runs — no Rank column, no
+      // daily-level stats columns.
+      lbTableHeader.style.gridTemplateColumns = "1fr 90px 90px 60px";
+      lbTableHeader.innerHTML = "<span>Player</span><span>Total Score</span><span>Days Played</span><span>Runs</span>";
+      let players;
+      try {
+        players = await FreeLeaderboardAPI.getWeeklyLeaderboard();
+      } catch {
+        lbEntries.innerHTML = '<div class="lb-empty">Free Leaderboard temporarily unavailable.</div>';
+        return;
+      }
+      if (players.length === 0) {
+        lbEntries.innerHTML = '<div class="lb-empty">No runs yet this week.</div>';
+        return;
+      }
+      const capped = players.slice(0, 100);
+      const myDeviceId = (function () { try { return localStorage.getItem(FREE_DEVICE_ID_KEY); } catch { return null; } })();
+      const gridCols = "1fr 90px 90px 60px";
+
+      let html = "";
+      for (let i = 0; i < capped.length; i++) {
+        const p = capped[i];
+        const nick = p.nickname.slice(0, 16);
+        const isMe = !!myDeviceId && p.device_id === myDeviceId;
+        const isFirst = i === 0;
+        const togId = `fwlRuns_${i}`;
+        html += `<div class="lb-row${isMe ? " lb-me" : ""}${isFirst ? " lb-first" : ""}" style="grid-template-columns: ${gridCols}; cursor:pointer;" onclick="var el=document.getElementById('${togId}'); if (el) el.classList.toggle('collapsed');">
+          <span class="lb-nick" title="${nick}">${nick}${isMe ? " (you)" : ""}</span>
+          <span class="lb-score-val mono">${p.weeklyScore}</span>
+          <span class="lb-copper-val mono">${p.daysPlayed}</span>
+          <span class="lb-time-val mono">${p.totalRuns}</span>
+        </div>`;
+        html += `<div class="lb-runs-container collapsed" id="${togId}">`;
+        for (const day of p.dayBreakdown) {
+          html += `<div style="padding:4px 0 4px 12px; font-size:12px; opacity:0.85;">
+            ${day.dayName} &middot; Score <span class="mono">${day.dailyScore}</span> &middot; ${day.runs} runs
+          </div>`;
+        }
+        html += '</div>';
+      }
+      lbEntries.innerHTML = html;
     } else if (lbCurrentPeriod === "week") {
       // Weekly leaderboard: aggregated per player + my individual runs
       lbTableHeader.innerHTML = "<span>#</span><span>Player</span><span>League</span><span>Weekly</span><span>Best15</span><span>Runs</span>";
@@ -6759,17 +6881,18 @@ button:disabled { opacity: .5; cursor: not-allowed; }
     // If the last-viewed period isn't valid for the current mode, snap
     // back to Today. Free has today + two lifetime tabs; paid has today
     // + week + all. Any cross-mode leftover falls through to today.
-    const freePeriods = ["today", "allcopper", "bestscores"];
+    const freePeriods = ["today", "week", "allcopper", "bestscores"];
     const paidPeriods = ["today", "week", "all"];
     const valid = gameMode === "free" ? freePeriods : paidPeriods;
     if (!valid.includes(lbCurrentPeriod)) {
       lbCurrentPeriod = "today";
       lbTabs.forEach(t => t.classList.toggle("active", t.dataset.period === "today"));
     }
-    // Invalidate lifetime snapshot caches so a new modal open pulls
-    // fresh numbers instead of serving stale ones.
+    // Invalidate lifetime + weekly snapshot caches so a new modal open
+    // pulls fresh numbers instead of serving stale ones.
     FreeLeaderboardAPI._freePlayersPromise = null;
     FreeLeaderboardAPI._bestRunPromise     = null;
+    FreeLeaderboardAPI._weeklyPromise      = null;
     lbOverlay.style.display = "flex";
     lbOverlay.classList.remove("show");
     requestAnimationFrame(() => requestAnimationFrame(() => lbOverlay.classList.add("show")));
