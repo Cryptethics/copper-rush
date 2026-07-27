@@ -1383,7 +1383,7 @@ button:disabled { opacity: .5; cursor: not-allowed; }
       background: linear-gradient(90deg, #ff8833, #ffcc66);
       border-radius: 4px;
       transform-origin: left center;
-      transform: scaleX(1);
+      transform: scaleX(var(--timer-pct, 1));
       transition: transform 0.1s linear;
     }
     #mhTimerFill.danger {
@@ -1441,6 +1441,108 @@ button:disabled { opacity: .5; cursor: not-allowed; }
       border-color: rgba(255,200,90,0.7);
       transform: scale(0.92);
     }
+
+    /* Mobile joystick — dev-only alternative control. Round base holds a
+       smaller stick that follows the finger while a touch is active. Direction
+       still maps to the same 8 discrete D-pad directions (no analog motion);
+       the stick position is purely visual feedback. Positioned exactly where
+       the D-pad sits so a Dev-Panel swap keeps the muscle memory. */
+    #mobile-joystick {
+      position: fixed;
+      bottom: calc(20px + env(safe-area-inset-bottom, 0px));
+      left: 16px;
+      display: none;
+      width: 176px;
+      height: 176px;
+      border-radius: 50%;
+      background: rgba(20,30,44,0.60);
+      border: 2px solid rgba(255,255,255,0.14);
+      box-shadow: 0 4px 14px rgba(0,0,0,0.5);
+      z-index: 80;
+      user-select: none;
+      -webkit-user-select: none;
+      touch-action: none;
+    }
+    #joystick-stick {
+      position: absolute;
+      top: 50%; left: 50%;
+      width: 66px;
+      height: 66px;
+      border-radius: 50%;
+      background: rgba(60,90,130,0.90);
+      border: 2px solid rgba(255,200,90,0.55);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.55);
+      transform: translate(-50%, -50%);
+      transition: transform 0.05s;
+      pointer-events: none;
+    }
+    #mobile-joystick.active {
+      background: rgba(30,50,80,0.75);
+      border-color: rgba(255,200,90,0.45);
+    }
+    #mobile-joystick.active #joystick-stick {
+      background: rgba(80,130,180,0.95);
+      border-color: rgba(255,220,120,0.85);
+    }
+
+    /* Mobile idle card — post-run summary panel shown on mobile only, when
+       body carries the game-idle class. Sits centred above a dim backdrop
+       (via body.game-idle::before) and hosts its own Play Again / View
+       Leaderboard buttons which delegate to the desktop btnStartNew /
+       btnViewLB (same click handlers → identical side effects). Hidden on
+       desktop unconditionally. */
+    #mobile-idle-card { display: none; }
+    .mic-title {
+      font-size: 15px;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      text-align: center;
+      color: #7ee787;
+      font-weight: 700;
+    }
+    .mic-stats { display: flex; flex-direction: column; gap: 4px; }
+    .mic-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 13px;
+      padding: 4px 0;
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+    }
+    .mic-row:last-child { border-bottom: none; }
+    .mic-lbl {
+      opacity: 0.65;
+      letter-spacing: 0.6px;
+      text-transform: uppercase;
+      font-size: 10px;
+    }
+    .mic-val {
+      font-family: ui-monospace, Menlo, monospace;
+      font-weight: 700;
+      font-size: 14px;
+    }
+    .mic-val.score-color   { color: #7ee787; }
+    .mic-val.copper-color  { color: #ffb347; }
+    .mic-val.diamond-color { color: #a8d4ff; }
+    .mic-actions { display: flex; flex-direction: column; gap: 8px; margin-top: 6px; }
+    .mic-actions button {
+      padding: 11px 14px;
+      font-size: 14px;
+      font-weight: 700;
+      border-radius: 10px;
+      border: 1px solid rgba(126,231,135,0.35);
+      background: rgba(20,30,44,0.85);
+      color: #e6eef8;
+      cursor: pointer;
+      font-family: inherit;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .mic-actions button:active { transform: scale(0.98); }
+    #micPlayAgain {
+      background: rgba(20,60,40,0.85);
+      border-color: rgba(126,231,135,0.55);
+      color: #b6f4be;
+    }
     .mobile-pu-btn {
       width: 92px; height: 92px;
       border-radius: 22px;
@@ -1487,14 +1589,16 @@ button:disabled { opacity: .5; cursor: not-allowed; }
        run starts; without this rule those inline styles also activate on
        desktop and overlap the canvas. Keep mobile elements hidden anywhere
        wider than the mobile breakpoint, regardless of JS. */
-    @media (min-width: 901px) {
-      #mobile-hud, #mobile-pu, #mobile-time-bar, #mobile-dpad { display: none !important; }
+    /* Desktop-guard: hide mobile controls anywhere BOTH dimensions clear
+       the mobile thresholds. Landscape phones (width > 900 but height ≤
+       600) do NOT match this, so their mobile controls still show. */
+    @media (min-width: 901px) and (min-height: 601px) {
+      #mobile-hud, #mobile-pu, #mobile-time-bar, #mobile-dpad, #mobile-joystick, #mobile-idle-card { display: none !important; }
     }
 
-    /* Mobile media query — portrait OR landscape, anything ≤ 900px wide.
-       Hides desktop side panels and resizes canvas so the controls
-       overlaid at the bottom never crop the play area. */
-    @media (max-width: 900px) {
+    /* Portrait mobile — narrow width regardless of height. Controls at
+       the bottom, canvas fills the vertical space above them. */
+    @media (max-width: 900px) and (orientation: portrait) {
       #wrap {
         grid-template-columns: 1fr;
         padding: 4px;
@@ -1502,7 +1606,9 @@ button:disabled { opacity: .5; cursor: not-allowed; }
         height: 100vh;
         height: 100dvh;
       }
-      #left-panel, #right-panel, #timer-side, .landing-topbar { display: none; }
+      /* Portrait uses the horizontal #mobile-time-bar at the top, so the
+         desktop-style vertical bar is redundant here. */
+      #timer-side { display: none; }
       #center { padding-top: 44px; padding-bottom: 180px; box-sizing: border-box; }
       canvas {
         width:  min(calc(100vw - 16px), calc(100vh - 220px));
@@ -1510,15 +1616,242 @@ button:disabled { opacity: .5; cursor: not-allowed; }
         width:  min(calc(100vw - 16px), calc(100dvh - 220px));
         height: min(calc(100vw - 16px), calc(100dvh - 220px));
         max-width: none;
-        /* Drag-anywhere control: stop the browser from panning/zooming
-           when the finger is on the play surface. */
         touch-action: none;
         -webkit-user-select: none;
         user-select: none;
         -webkit-tap-highlight-color: transparent;
       }
-      /* On landing the controls / HUD / time-bar should never appear */
-      body.landing-on #mobile-hud, body.landing-on #mobile-pu, body.landing-on #mobile-time-bar { display: none !important; }
+    }
+
+    /* Landscape mobile — height is the limiting dimension. D-pad hugs
+       left edge vertically, power-ups + HUD hug the right, canvas fills
+       the middle sized by whichever of the remaining width / height is
+       smaller. HUD moves out of the top so canvas can claim the full
+       viewport height minus a small margin. */
+    @media (orientation: landscape) and (max-height: 600px) {
+      #wrap {
+        grid-template-columns: 1fr;
+        padding: 0;
+        gap: 0;
+        height: 100vh;
+        height: 100dvh;
+      }
+      #center {
+        padding: 12px 120px 12px 200px;
+        box-sizing: border-box;
+      }
+      canvas {
+        /* -338px = 200 left pad + 120 right pad + 12 timer-side + 6 gap. */
+        width:  min(calc(100vw - 338px), calc(100vh - 24px));
+        height: min(calc(100vw - 338px), calc(100vh - 24px));
+        width:  min(calc(100vw - 338px), calc(100dvh - 24px));
+        height: min(calc(100vw - 338px), calc(100dvh - 24px));
+        max-width: none;
+        touch-action: none;
+        -webkit-user-select: none;
+        user-select: none;
+        -webkit-tap-highlight-color: transparent;
+      }
+      /* Vertically-centered along the left/right edges. Bottom-offset
+         from portrait is removed via bottom:auto so `top: 50%` wins. */
+      #mobile-dpad {
+        bottom: auto;
+        top: 50%;
+        left: 12px;
+        transform: translateY(-50%);
+      }
+      /* Joystick mirrors the D-pad landscape position + shrinks a touch to
+         match the tighter vertical budget. */
+      #mobile-joystick {
+        bottom: auto;
+        top: 50%;
+        left: 12px;
+        transform: translateY(-50%);
+        width: 148px;
+        height: 148px;
+      }
+      #mobile-joystick #joystick-stick {
+        width: 56px;
+        height: 56px;
+      }
+      #mobile-pu {
+        bottom: auto;
+        top: 50%;
+        right: 12px;
+        transform: translateY(-50%);
+      }
+      /* HUD moves from top-center pill to a compact vertical column in
+         the top-right corner — same values (time / copper / diamonds),
+         stacked instead of inline. Separators hidden. */
+      #mobile-hud {
+        top: calc(8px + env(safe-area-inset-top, 0px));
+        right: 12px;
+        left: auto;
+        transform: none;
+        display: flex;
+        flex-direction: column;
+        align-items: flex-end;
+        gap: 2px;
+        padding: 8px 10px;
+        font-size: 12px;
+        line-height: 1.15;
+        min-width: 80px;
+      }
+      #mobile-hud .mh-sep    { display: none; }
+      #mobile-hud .mh-copper { margin-left: 0; }
+      #mobile-hud .mh-diam   { margin-left: 0; }
+      /* Landscape reuses the desktop #timer-side vertical bar — it's
+         already a flex sibling of the canvas inside #canvas-row, so
+         align-items:stretch makes it match canvas height exactly and
+         it sits glued to the canvas right edge (via the 10px gap). No
+         positional math needed. The horizontal #mobile-time-bar is
+         redundant here — hide it. #timeLeft numeric duplicate is also
+         hidden since the HUD already carries the time text. */
+      #mobile-time-bar { display: none !important; }
+      #timer-side {
+        width: 12px;
+        gap: 0;
+      }
+      #timer-track { width: 8px; }
+      #timeLeft { display: none; }
+      #canvas-row { gap: 6px; }
+
+      /* Endscreen card compressed to fit the landscape viewport height
+         so no scroll is needed. Only sizes / paddings shrink; layout,
+         copy and data are untouched. */
+      #card {
+        width: min(80vw, 560px);
+        max-height: calc(100vh - 12px);
+        max-height: calc(100dvh - 12px);
+      }
+      .end-header { padding: 10px 16px 8px; }
+      .end-header h2 { font-size: 16px; }
+      .end-header .end-sub { font-size: 10px; margin-top: 2px; }
+      .end-body { padding: 8px 16px; }
+      .end-stat-row { padding: 4px 0; }
+      .end-stat-label { font-size: 11px; }
+      .end-stat-value { font-size: 12px; }
+      .end-highlight { margin: 8px 0; padding: 8px; }
+      .end-highlight-label { font-size: 9px; }
+      .end-highlight-value { font-size: 22px; }
+      .end-warn { font-size: 10px; padding: 6px; }
+      .end-actions { padding: 8px 16px 10px; gap: 6px; }
+      .end-actions button { padding: 8px; font-size: 13px; }
+    }
+
+    /* Shared mobile rules (both portrait AND landscape phones) — desktop
+       side-panels hidden, #right-panel switched to display:contents so
+       #btnStartNew / #btnViewLB can survive as fixed-position CTAs.
+       #timer-side is handled per-orientation below: hidden on portrait
+       (horizontal bar takes its place), shown on landscape as the
+       glued-to-canvas vertical timer. */
+    @media (max-width: 900px) and (orientation: portrait),
+           (orientation: landscape) and (max-height: 600px) {
+      #left-panel, .landing-topbar { display: none; }
+      #right-panel { display: contents; }
+      #right-panel > *:not(#btnStartNew):not(#btnViewLB) { display: none !important; }
+      /* Both idle CTAs sit side-by-side, centered around the viewport
+         midline with a 6px gap between them. Only visible while the
+         body carries the `game-idle` class (set by enterIdleState()).
+         #btnStartNew's inline display:"" is set by the same JS, and its
+         positioning here overrides the desktop in-panel layout. */
+      #btnViewLB { display: none; }
+      body.game-idle #btnStartNew,
+      body.game-idle #btnViewLB {
+        position: fixed !important;
+        top: auto !important;
+        bottom: calc(28px + env(safe-area-inset-bottom, 0px));
+        width: auto !important;
+        padding: 12px 22px !important;
+        margin: 0 !important;
+        z-index: 76;
+        font-size: 15px !important;
+        font-weight: 700;
+        box-shadow: 0 6px 18px rgba(0,0,0,0.5);
+        min-width: 150px;
+        text-align: center;
+      }
+      body.game-idle #btnStartNew {
+        display: block !important;
+        right: calc(50% + 6px);
+        left: auto !important;
+        transform: none !important;
+      }
+      body.game-idle #btnViewLB {
+        display: block !important;
+        left: calc(50% + 6px);
+        right: auto !important;
+        transform: none !important;
+      }
+      /* On landing the controls / HUD / time-bar / joystick / idle card
+         should never appear. */
+      body.landing-on #mobile-hud,
+      body.landing-on #mobile-pu,
+      body.landing-on #mobile-time-bar,
+      body.landing-on #mobile-joystick,
+      body.landing-on #mobile-idle-card { display: none !important; }
+
+      /* Mobile idle card — visible whenever game-idle is set on mobile.
+         Positioned centre-screen above a dim backdrop; the card contains
+         its own Play Again / View Leaderboard buttons, so the fixed CTAs
+         are suppressed while the card is up. */
+      body.game-idle #mobile-idle-card {
+        display: flex;
+        flex-direction: column;
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        z-index: 78;
+        background: rgba(15,23,36,0.96);
+        border: 1px solid rgba(126,231,135,0.35);
+        border-radius: 14px;
+        padding: 16px 20px;
+        box-shadow: 0 10px 32px rgba(0,0,0,0.6);
+        min-width: 260px;
+        max-width: min(88vw, 340px);
+        max-height: calc(100vh - 24px);
+        max-height: calc(100dvh - 24px);
+        gap: 10px;
+        overflow: auto;
+      }
+      /* Dim backdrop behind the card so the map stays visible but recedes. */
+      body.game-idle::before {
+        content: "";
+        position: fixed;
+        inset: 0;
+        background: rgba(0,0,0,0.55);
+        z-index: 77;
+        pointer-events: none;
+      }
+      /* Card owns the CTAs while it's up — hide the fixed bottom versions. */
+      body.game-idle #btnStartNew,
+      body.game-idle #btnViewLB { display: none !important; }
+      /* When the Leaderboard modal is up (from either the idle-card
+         "View Leaderboard" button or the desktop CTA), suppress the card
+         and its backdrop so the modal is the only overlay visible. Closing
+         the modal (closeLBModal → removes .lb-modal-open) restores the
+         card because body.game-idle is still set. */
+      body.game-idle.lb-modal-open #mobile-idle-card { display: none !important; }
+      body.game-idle.lb-modal-open::before { content: none; }
+    }
+
+    /* Landscape mobile card sizing — tighter to fit the reduced vertical
+       budget without scrolling. */
+    @media (orientation: landscape) and (max-height: 600px) {
+      body.game-idle #mobile-idle-card {
+        padding: 10px 14px;
+        gap: 6px;
+        min-width: 220px;
+        max-width: min(70vw, 300px);
+      }
+      .mic-title    { font-size: 13px; letter-spacing: 1.5px; }
+      .mic-stats    { gap: 2px; }
+      .mic-row      { font-size: 12px; padding: 3px 0; }
+      .mic-lbl      { font-size: 9px; }
+      .mic-val      { font-size: 13px; }
+      .mic-actions  { gap: 6px; margin-top: 2px; }
+      .mic-actions button { padding: 8px 12px; font-size: 13px; }
     }
 
     /* Nickname input on landing */
@@ -2099,6 +2432,35 @@ button:disabled { opacity: .5; cursor: not-allowed; }
     <button class="dpad-btn" data-dir="se" aria-label="down-right">&#8600;</button>
   </div>
 
+  <!-- Mobile joystick — experimental alternative to #mobile-dpad, activated
+       via the Dev Panel (?dev=1) selector. Same left-area position, same
+       8-direction mapping, same dpadPress/dpadRelease dispatch — only the
+       visual + finger-tracking mechanism differ. Hidden by default. -->
+  <div id="mobile-joystick">
+    <div id="joystick-stick"></div>
+  </div>
+
+  <!-- Mobile idle card — shown on mobile only when body.game-idle is set
+       (i.e. after any run ends and the endscreen is dismissed). Replaces
+       the "empty map + two floating buttons" state with a single centred
+       panel that summarises the last run and hosts the same Play Again /
+       View Leaderboard CTAs (delegated to the real desktop buttons so
+       every side effect fires identically). Populated from lastRunStats,
+       so no extra network request. -->
+  <div id="mobile-idle-card" aria-hidden="true">
+    <div class="mic-title">Run Complete</div>
+    <div class="mic-stats">
+      <div class="mic-row"><span class="mic-lbl">Score</span><span class="mic-val score-color" id="micScore">0</span></div>
+      <div class="mic-row"><span class="mic-lbl">Copper</span><span class="mic-val copper-color" id="micCopper">0</span></div>
+      <div class="mic-row"><span class="mic-lbl">Diamonds</span><span class="mic-val diamond-color" id="micDiam">0</span></div>
+      <div class="mic-row"><span class="mic-lbl">Best Score</span><span class="mic-val" id="micBest">0</span></div>
+    </div>
+    <div class="mic-actions">
+      <button id="micPlayAgain" type="button">&#9654; Play Again</button>
+      <button id="micViewLB"    type="button">&#127942; View Leaderboard</button>
+    </div>
+  </div>
+
   <!-- Mobile power-up buttons with countdown label inside. -->
   <div id="mobile-pu">
     <button class="mobile-pu-btn" id="mBtnMag">
@@ -2149,6 +2511,13 @@ button:disabled { opacity: .5; cursor: not-allowed; }
       <div class="dp-row dp-checks">
         <label><input type="checkbox" id="dpNoFog"> No fog</label>
         <label><input type="checkbox" id="dpMapAudit"> Map audit</label>
+      </div>
+      <div class="dp-row">
+        <span class="dp-label">Controls</span>
+        <select id="dpMobileControls">
+          <option value="dpad">D-pad</option>
+          <option value="joystick">Joystick</option>
+        </select>
       </div>
       <div class="dp-row">
         <button id="dpReset">Reset dev settings</button>
@@ -3701,7 +4070,7 @@ button:disabled { opacity: .5; cursor: not-allowed; }
   })();
   const DEV_LS_KEY = "copper_rush_dev_panel_v1";
   function _devDefaults() {
-    return { map: "", mutator: "", seed: "", noFog: false, mapAudit: false };
+    return { map: "", mutator: "", seed: "", noFog: false, mapAudit: false, mobileControls: "joystick" };
   }
   const devSettings = DEV_TOOLS_ENABLED ? (function () {
     try {
@@ -4006,6 +4375,17 @@ button:disabled { opacity: .5; cursor: not-allowed; }
   const RISK_COPPER_MULT = 3; // copper on risk tiles worth 3x
   const RISK_GHOST_BOOST = 0.20; // +20% ghost speed
   const GHOST_MAX_PLAYER_RATIO = 1.05; // ghost never exceeds 105% of player speed
+  // Small handicap for touch play — the D-pad can't match keyboard precision,
+  // so ghost pursues a hair slower on mobile. Applied AFTER the ratio cap so
+  // it isn't masked when ghost is already pinned at maxGhostSpeed. Bump this
+  // single number (0.95 → 0.96/0.97/1.00) to tune / disable the handicap.
+  const MOBILE_GHOST_SPEED_MULTIPLIER = 0.95;
+  // Matches the CSS mobile breakpoint used for mobile HUD / D-pad / power-ups,
+  // so the multiplier applies exactly when the player is actually on touch UI.
+  const mobileControlsMQ = (typeof window !== "undefined" && window.matchMedia)
+    ? window.matchMedia("(max-width: 900px)")
+    : { matches: false };
+  function isMobileControls() { return !!mobileControlsMQ.matches; }
   let riskTiles = new Set(); // "x,y"
   let ghostRiskBoost = 0; // current additive boost (decays)
   let playerOnRiskTile = false;
@@ -4800,7 +5180,11 @@ button:disabled { opacity: .5; cursor: not-allowed; }
     // FAST_GAS mutator adds a constant boost to the ghost speed ratio.
     // The GHOST_MAX_PLAYER_RATIO cap still applies via maxGhostSpeed.
     const baseGhostSpeed = PLAYER_BASE_SPEED * (ghostRatio(elapsedSec) + getActiveGhostRatioBoost());
-    const speed = Math.min(maxGhostSpeed, baseGhostSpeed * (1 + ghostRiskBoost));
+    // Apply the touch handicap AFTER the ratio cap — otherwise the cap would
+    // clamp us right back to 105% and the multiplier would be a no-op at high
+    // ghostRatio (e.g. Frenzy). Same magnitude, just scaled down on mobile.
+    let speed = Math.min(maxGhostSpeed, baseGhostSpeed * (1 + ghostRiskBoost));
+    if (isMobileControls()) speed *= MOBILE_GHOST_SPEED_MULTIPLIER;
 
     const dist = Math.hypot(player.x - ghost.x, player.y - ghost.y);
     let vx = 0, vy = 0;
@@ -5041,8 +5425,11 @@ button:disabled { opacity: .5; cursor: not-allowed; }
     elTimerFill.classList.toggle("danger", leftMs < 5000);
 
     // Mirror time/HUD into the mobile overlays every frame so they stay snappy.
+    // Publish the fill ratio as a CSS variable so the timer element can be
+    // horizontal (portrait: scaleX) or vertical (landscape: scaleY) purely
+    // via CSS media queries — no per-frame orientation check in JS.
     if (mobileTimeBar && mobileTimeBar.style.display !== "none") {
-      mhTimerFill.style.transform = "scaleX(" + (pct / 100) + ")";
+      mhTimerFill.style.setProperty("--timer-pct", (pct / 100));
       mhTimerFill.classList.toggle("danger", leftMs < 5000);
     }
     if (mobileHud && mobileHud.style.display !== "none") {
@@ -5197,12 +5584,49 @@ button:disabled { opacity: .5; cursor: not-allowed; }
   const btnStartNew = document.getElementById("btnStartNew");
   let idleState = false;
 
+  // Post-run snapshot used by the mobile idle card (#mobile-idle-card).
+  // Populated at the end of endRun() and read from enterIdleState() — no
+  // network fetch is made when the card is shown; if this is null (e.g. the
+  // player has not completed a run this session), the card falls back to
+  // zero values.
+  let lastRunStats = null;
+
+  // Mobile idle card elements + button delegation. The two card buttons
+  // simply .click() the real desktop CTAs so every side effect (paid
+  // payment flow, mode reset, resetRun, LB modal opening cache
+  // invalidation) fires exactly once through the existing code paths.
+  const micScore      = document.getElementById("micScore");
+  const micCopper     = document.getElementById("micCopper");
+  const micDiam       = document.getElementById("micDiam");
+  const micBest       = document.getElementById("micBest");
+  const micPlayAgain  = document.getElementById("micPlayAgain");
+  const micViewLB     = document.getElementById("micViewLB");
+  if (micPlayAgain) micPlayAgain.addEventListener("click", () => { btnStartNew.click(); });
+  if (micViewLB) {
+    micViewLB.addEventListener("click", () => {
+      const realBtn = document.getElementById("btnViewLB");
+      if (realBtn) realBtn.click();
+    });
+  }
+
   function enterIdleState() {
     idleState = true;
     btnStartNew.innerHTML = gameMode === "free"
       ? "▶ Play Again"
       : "▶ Start New Game";
     btnStartNew.style.display = "";
+    // Body class drives mobile-only CSS that pulls both #btnStartNew and
+    // #btnViewLB into a fixed bottom-center CTA pair. Desktop ignores it.
+    document.body.classList.add("game-idle");
+    // Populate the mobile idle card with the last-run snapshot. Desktop
+    // ignores the card entirely (hidden by media query). Values are
+    // captured at endRun time so this call never touches the network.
+    if (lastRunStats) {
+      if (micScore)  micScore.textContent  = String(lastRunStats.score);
+      if (micCopper) micCopper.textContent = String(lastRunStats.copper);
+      if (micDiam)   micDiam.textContent   = String(lastRunStats.diamonds);
+      if (micBest)   micBest.textContent   = String(lastRunStats.bestScore);
+    }
     updateLandingMutatorCard(); // refresh in case the UTC day rolled over
   }
 
@@ -5212,6 +5636,7 @@ button:disabled { opacity: .5; cursor: not-allowed; }
     }
     idleState = false;
     btnStartNew.style.display = "none";
+    document.body.classList.remove("game-idle");
     resetRun();
   });
 
@@ -5231,6 +5656,25 @@ button:disabled { opacity: .5; cursor: not-allowed; }
 
     // Personal best check (uses cached value from last updateLeaderboardUI call)
     const isNewBest = lb.score > lbDailyBest && lb.score > 0;
+
+    // Snapshot for the mobile idle card. Read the current "best" from
+    // whatever the UI already holds (paid: lbDailyBest, updated by
+    // updateLeaderboardUI; free: the #freeBestScore text), then fold in
+    // this run's score. No network call needed.
+    const scoreThisRun = died ? 0 : lb.score;
+    let prevBest = 0;
+    if (gameMode === "free") {
+      const bestEl = document.getElementById("freeBestScore");
+      prevBest = bestEl ? (Number(bestEl.textContent) || 0) : 0;
+    } else {
+      prevBest = lbDailyBest || 0;
+    }
+    lastRunStats = {
+      score:     scoreThisRun,
+      copper:    copperCollected,
+      diamonds:  diamondsCollected.length,
+      bestScore: Math.max(prevBest, scoreThisRun),
+    };
 
     // Track all-time stats. Paid mirrors to Supabase; free is
     // localStorage-only per browser (no wallet binding).
@@ -6269,6 +6713,7 @@ button:disabled { opacity: .5; cursor: not-allowed; }
     const elSeed    = document.getElementById("dpSeed");
     const elNoFog   = document.getElementById("dpNoFog");
     const elAudit   = document.getElementById("dpMapAudit");
+    const elCtrls   = document.getElementById("dpMobileControls");
     const elReset   = document.getElementById("dpReset");
     const elToggle  = document.getElementById("dpToggle");
     const elBody    = document.getElementById("dpBody");
@@ -6305,18 +6750,38 @@ button:disabled { opacity: .5; cursor: not-allowed; }
     elSeed.value  = devSettings.seed || "";
     elNoFog.checked = !!devSettings.noFog;
     elAudit.checked = !!devSettings.mapAudit;
+    if (elCtrls) {
+      const savedCtrls = (devSettings.mobileControls === "dpad") ? "dpad" : "joystick";
+      elCtrls.value = savedCtrls;
+      devSettings.mobileControls = savedCtrls;
+    }
 
     elMap.addEventListener("change",     () => { devSettings.map     = elMap.value;       saveDevSettings(); });
     elMutator.addEventListener("change", () => { devSettings.mutator = elMutator.value;   saveDevSettings(); });
     elSeed.addEventListener("input",     () => { devSettings.seed    = elSeed.value;      saveDevSettings(); });
     elNoFog.addEventListener("change",   () => { devSettings.noFog   = elNoFog.checked;   saveDevSettings(); });
     elAudit.addEventListener("change",   () => { devSettings.mapAudit= elAudit.checked;   saveDevSettings(); });
+    if (elCtrls) {
+      elCtrls.addEventListener("change", () => {
+        devSettings.mobileControls = (elCtrls.value === "dpad") ? "dpad" : "joystick";
+        saveDevSettings();
+        // Live-swap: drop any held key, then re-run the visibility logic so
+        // the newly-selected control appears and the previous one hides.
+        try { dpadClearAll();     } catch {}
+        try { joystickClearAll(); } catch {}
+        updateMobileUI();
+      });
+    }
 
     elReset.addEventListener("click", () => {
       Object.assign(devSettings, _devDefaults());
       saveDevSettings();
       elMap.value = ""; elMutator.value = ""; elSeed.value = "";
       elNoFog.checked = false; elAudit.checked = false;
+      if (elCtrls) elCtrls.value = "joystick";
+      try { dpadClearAll();     } catch {}
+      try { joystickClearAll(); } catch {}
+      updateMobileUI();
     });
     elToggle.addEventListener("click", () => {
       elBody.classList.toggle("collapsed");
@@ -6550,13 +7015,14 @@ button:disabled { opacity: .5; cursor: not-allowed; }
   const lbTableHeader = document.getElementById("lb-table-header");
 
   async function renderLBEntries() {
-    // Free mode gets today + two lifetime tabs (allcopper, bestscores);
-    // paid gets today + week + all. CSS hides invalid tabs, but a JS
-    // guard keeps the render sane if lbCurrentPeriod ever slips through.
+    // Free mode gets today + week + two lifetime tabs (allcopper,
+    // bestscores); paid gets today + week + all. CSS hides invalid tabs,
+    // but a JS guard keeps the render sane if lbCurrentPeriod ever slips
+    // through.
     const isFree = gameMode === "free";
     const freeOnlyPeriod = lbCurrentPeriod === "allcopper" || lbCurrentPeriod === "bestscores";
-    if (isFree && !(lbCurrentPeriod === "today" || freeOnlyPeriod)) {
-      lbEntries.innerHTML = '<div class="lb-empty">Free Leaderboard is daily only.</div>';
+    if (isFree && !(lbCurrentPeriod === "today" || lbCurrentPeriod === "week" || freeOnlyPeriod)) {
+      lbEntries.innerHTML = '<div class="lb-empty">Not available in free mode.</div>';
       return;
     }
     if (!isFree && freeOnlyPeriod) {
@@ -6786,15 +7252,15 @@ button:disabled { opacity: .5; cursor: not-allowed; }
         const isMe = !!myDeviceId && p.device_id === myDeviceId;
         const isFirst = i === 0;
         const togId = `fwlRuns_${i}`;
-        html += `<div class="lb-row${isMe ? " lb-me" : ""}${isFirst ? " lb-first" : ""}" style="grid-template-columns: ${gridCols}; cursor:pointer;" onclick="var el=document.getElementById('${togId}'); if (el) el.classList.toggle('collapsed');">
-          <span class="lb-nick" title="${nick}">${nick}${isMe ? " (you)" : ""}</span>
+        html += `<div class="lb-row${isMe ? " lb-me" : ""}${isFirst ? " lb-first" : ""}" style="grid-template-columns: ${gridCols}; cursor:pointer;" onclick="var el=document.getElementById('${togId}'); if (el) { var wasCollapsed = el.classList.contains('collapsed'); el.classList.toggle('collapsed'); var ch = this.querySelector('.lb-week-chev'); if (ch) ch.innerHTML = wasCollapsed ? '&#9660;' : '&#9654;'; }">
+          <span class="lb-nick" title="${nick}">${i + 1}. ${nick}${isMe ? " (you)" : ""} <span class="lb-week-chev" style="font-size:10px; opacity:0.7; margin-left:4px;">&#9654;</span></span>
           <span class="lb-score-val mono">${p.weeklyScore}</span>
           <span class="lb-copper-val mono">${p.daysPlayed}</span>
           <span class="lb-time-val mono">${p.totalRuns}</span>
         </div>`;
         html += `<div class="lb-runs-container collapsed" id="${togId}">`;
         for (const day of p.dayBreakdown) {
-          html += `<div style="padding:4px 0 4px 12px; font-size:12px; opacity:0.85;">
+          html += `<div style="padding: 6px 0 6px 22px; font-size: 12px; opacity: 0.9; letter-spacing: 0.2px;">
             ${day.dayName} &middot; Score <span class="mono">${day.dailyScore}</span> &middot; ${day.runs} runs
           </div>`;
         }
@@ -6912,12 +7378,21 @@ button:disabled { opacity: .5; cursor: not-allowed; }
     lbOverlay.style.display = "flex";
     lbOverlay.classList.remove("show");
     requestAnimationFrame(() => requestAnimationFrame(() => lbOverlay.classList.add("show")));
+    // Mobile-only: hide the idle card + its backdrop while the LB modal
+    // is up (via CSS). game-idle stays set so closing the modal restores
+    // the card exactly as it was.
+    document.body.classList.add("lb-modal-open");
     renderLBEntries();
   }
 
   function closeLBModal() {
     lbOverlay.classList.remove("show");
     setTimeout(() => { lbOverlay.style.display = "none"; }, 300);
+    // Drop the suppression class immediately — the CSS reveal of the idle
+    // card can crossfade with the modal's own fade-out, matching the
+    // "modal closed → card back" intent without waiting for the 300ms
+    // display flip.
+    document.body.classList.remove("lb-modal-open");
   }
 
   btnViewLB.addEventListener("click", openLBModal);
@@ -6990,14 +7465,32 @@ button:disabled { opacity: .5; cursor: not-allowed; }
   }
 
   if (mobileDpad) {
-    // Resolve which D-pad button the finger is currently over. Returns the
-    // dir string or null if the finger is outside the D-pad.
-    function dirFromPoint(x, y) {
-      const el = document.elementFromPoint(x, y);
-      if (!el) return null;
-      const btn = el.closest(".dpad-btn");
-      if (!btn || !mobileDpad.contains(btn)) return null;
-      return btn.getAttribute("data-dir");
+    // Direction from angle around the D-pad center, NOT from
+    // elementFromPoint(). The old approach released the direction the
+    // instant the finger left a .dpad-btn — either into the 4px gap
+    // between buttons, over the empty center cell, or a hair off the
+    // D-pad — which read as a full stop mid-move. Now: once a touch
+    // starts on the D-pad we track it purely by angle, so the finger
+    // can slide anywhere on-screen and the player keeps moving. Only
+    // touchend / touchcancel actually release.
+    //
+    // A small deadzone at the exact center keeps the last direction
+    // when the finger passes through the middle, preventing the
+    // angular flip that would otherwise happen on a diagonal switch.
+    const DPAD_DIRS = ["e", "ne", "n", "nw", "w", "sw", "s", "se"];
+    const DPAD_DEADZONE_PX = 15;
+    function dirFromPoint(x, y, prevDir) {
+      const rect = mobileDpad.getBoundingClientRect();
+      const cx = rect.left + rect.width  / 2;
+      const cy = rect.top  + rect.height / 2;
+      const dx = x - cx;
+      const dy = y - cy;
+      if (Math.hypot(dx, dy) < DPAD_DEADZONE_PX) return prevDir || null;
+      // atan2(-dy, dx): screen Y grows down, so flip it so "up on screen"
+      // maps to +90°. That gives us 0=E, 90=N, ±180=W, -90=S.
+      const angleDeg = Math.atan2(-dy, dx) * 180 / Math.PI;
+      const idx = ((Math.round(angleDeg / 45) % 8) + 8) % 8;
+      return DPAD_DIRS[idx];
     }
     // Repaint .pressed visuals from dpadActive after every state change.
     function paintPressed() {
@@ -7010,7 +7503,7 @@ button:disabled { opacity: .5; cursor: not-allowed; }
     mobileDpad.addEventListener("touchstart", (e) => {
       e.preventDefault();
       for (const t of e.changedTouches) {
-        const dir = dirFromPoint(t.clientX, t.clientY);
+        const dir = dirFromPoint(t.clientX, t.clientY, null);
         if (dir) dpadPress(dir);
         dpadTouchMap.set(t.identifier, dir);
       }
@@ -7022,7 +7515,7 @@ button:disabled { opacity: .5; cursor: not-allowed; }
       for (const t of e.changedTouches) {
         if (!dpadTouchMap.has(t.identifier)) continue;
         const prevDir = dpadTouchMap.get(t.identifier);
-        const curDir  = dirFromPoint(t.clientX, t.clientY);
+        const curDir  = dirFromPoint(t.clientX, t.clientY, prevDir);
         if (curDir !== prevDir) {
           if (prevDir) dpadRelease(prevDir);
           if (curDir)  dpadPress(curDir);
@@ -7044,6 +7537,112 @@ button:disabled { opacity: .5; cursor: not-allowed; }
     };
     mobileDpad.addEventListener("touchend",    endTouches, { passive: false });
     mobileDpad.addEventListener("touchcancel", endTouches, { passive: false });
+  }
+
+  // ----------------------------
+  // Mobile joystick — experimental alternative to the D-pad, enabled from
+  // the Dev Panel (?dev=1). Same 8 direction outputs, same dpadPress /
+  // dpadRelease / DPAD_DIR_KEYS dispatch — the stick is purely visual, no
+  // analog motion reaches the game. Direction is picked from the angle of
+  // the finger relative to the joystick centre; a small central deadzone
+  // preserves the last direction while the finger crosses through the
+  // middle. touchend / touchcancel are the only releases.
+  // ----------------------------
+  const mobileJoystick = document.getElementById("mobile-joystick");
+  const joystickStick  = document.getElementById("joystick-stick");
+  const joystickTouchMap = new Map(); // touch id -> current dir (or null)
+  const JOYSTICK_DIRS = ["e", "ne", "n", "nw", "w", "sw", "s", "se"];
+  const JOYSTICK_DEADZONE_PX = 18;
+
+  function joystickCompute(x, y, prevDir) {
+    const rect = mobileJoystick.getBoundingClientRect();
+    const cx = rect.left + rect.width  / 2;
+    const cy = rect.top  + rect.height / 2;
+    const dx = x - cx;
+    const dy = y - cy;
+    const dist = Math.hypot(dx, dy);
+    // Clamp visual stick offset to 40% of base radius (keeps stick inside
+    // the ring even when the finger is well outside the joystick body).
+    const maxOffset = rect.width * 0.35;
+    const clamped   = Math.min(dist, maxOffset);
+    const oX = dist > 0 ? (dx / dist) * clamped : 0;
+    const oY = dist > 0 ? (dy / dist) * clamped : 0;
+    let dir;
+    if (dist < JOYSTICK_DEADZONE_PX) {
+      dir = prevDir || null;
+    } else {
+      const angleDeg = Math.atan2(-dy, dx) * 180 / Math.PI;
+      const idx = ((Math.round(angleDeg / 45) % 8) + 8) % 8;
+      dir = JOYSTICK_DIRS[idx];
+    }
+    return { dir, oX, oY };
+  }
+  function setJoystickStick(oX, oY) {
+    if (!joystickStick) return;
+    joystickStick.style.transform = "translate(calc(-50% + " + oX + "px), calc(-50% + " + oY + "px))";
+  }
+  function resetJoystickStick() {
+    if (!joystickStick) return;
+    joystickStick.style.transform = "translate(-50%, -50%)";
+  }
+  function joystickClearAll() {
+    for (const dir of joystickTouchMap.values()) {
+      if (dir) dpadRelease(dir);
+    }
+    joystickTouchMap.clear();
+    resetJoystickStick();
+    if (mobileJoystick) mobileJoystick.classList.remove("active");
+  }
+
+  if (mobileJoystick) {
+    mobileJoystick.addEventListener("touchstart", (e) => {
+      e.preventDefault();
+      for (const t of e.changedTouches) {
+        const { dir, oX, oY } = joystickCompute(t.clientX, t.clientY, null);
+        if (dir) dpadPress(dir);
+        joystickTouchMap.set(t.identifier, dir);
+        setJoystickStick(oX, oY);
+      }
+      mobileJoystick.classList.add("active");
+    }, { passive: false });
+
+    mobileJoystick.addEventListener("touchmove", (e) => {
+      e.preventDefault();
+      for (const t of e.changedTouches) {
+        if (!joystickTouchMap.has(t.identifier)) continue;
+        const prevDir = joystickTouchMap.get(t.identifier);
+        const { dir, oX, oY } = joystickCompute(t.clientX, t.clientY, prevDir);
+        if (dir !== prevDir) {
+          if (prevDir) dpadRelease(prevDir);
+          if (dir)     dpadPress(dir);
+          joystickTouchMap.set(t.identifier, dir);
+        }
+        setJoystickStick(oX, oY);
+      }
+    }, { passive: false });
+
+    const joystickEnd = (e) => {
+      e.preventDefault();
+      for (const t of e.changedTouches) {
+        if (!joystickTouchMap.has(t.identifier)) continue;
+        const dir = joystickTouchMap.get(t.identifier);
+        if (dir) dpadRelease(dir);
+        joystickTouchMap.delete(t.identifier);
+      }
+      if (joystickTouchMap.size === 0) {
+        resetJoystickStick();
+        mobileJoystick.classList.remove("active");
+      }
+    };
+    mobileJoystick.addEventListener("touchend",    joystickEnd, { passive: false });
+    mobileJoystick.addEventListener("touchcancel", joystickEnd, { passive: false });
+  }
+
+  // Which mobile control is currently selected — driven by the Dev Panel.
+  // Public users (no ?dev=1) always get "joystick"; Dev users can opt into
+  // "dpad" via the panel selector.
+  function mobileControlsMode() {
+    return (devSettings && devSettings.mobileControls === "dpad") ? "dpad" : "joystick";
   }
 
   // Power-up buttons (mobile) — tap activates if available.
@@ -7082,17 +7681,22 @@ button:disabled { opacity: .5; cursor: not-allowed; }
   // inside the desktop updateHUD() (called from the game loop), so the mobile
   // overlays refresh at ~60 fps instead of the previous 10 fps poll.
 
-  // Hide mobile controls + HUD on landing / between runs.
+  // Hide mobile controls + HUD on landing / between runs. Which control
+  // (D-pad vs Joystick) is shown while active is driven by the Dev Panel
+  // selector — see mobileControlsMode(). Public users always see the Joystick.
   function updateMobileUI() {
     const gameActive = !landingActive && !ended;
-    if (mobilePu)      mobilePu.style.display      = gameActive ? "flex"  : "none";
-    if (mobileHud)     mobileHud.style.display     = gameActive ? "block" : "none";
-    if (mobileTimeBar) mobileTimeBar.style.display = gameActive ? "block" : "none";
-    if (mobileDpad)    mobileDpad.style.display    = gameActive ? "grid"  : "none";
+    const mode = mobileControlsMode();
+    if (mobilePu)        mobilePu.style.display        = gameActive ? "flex"  : "none";
+    if (mobileHud)       mobileHud.style.display       = gameActive ? "block" : "none";
+    if (mobileTimeBar)   mobileTimeBar.style.display   = gameActive ? "block" : "none";
+    if (mobileDpad)      mobileDpad.style.display      = (gameActive && mode === "dpad")     ? "grid"  : "none";
+    if (mobileJoystick)  mobileJoystick.style.display  = (gameActive && mode === "joystick") ? "block" : "none";
     document.body.classList.toggle("landing-on", landingActive);
     if (!gameActive) {
       // Drop any held direction when the game ends or returns to landing.
       dpadClearAll();
+      joystickClearAll();
     }
   }
 
