@@ -1748,6 +1748,18 @@ button:disabled { opacity: .5; cursor: not-allowed; }
     @media (max-width: 900px) and (orientation: portrait),
            (orientation: landscape) and (max-height: 600px) {
       #left-panel, .landing-topbar { display: none; }
+      /* Re-expose the landing topbar (Docs link + wallet) on the landing
+         screen only — the base rule above hides it for gameplay. */
+      body.landing-on .landing-topbar {
+        display: flex;
+        padding: 10px 12px;
+        z-index: 111;
+      }
+      body.landing-on .topbar-link {
+        font-size: 12px;
+        padding: 6px 10px;
+        letter-spacing: 1px;
+      }
       #right-panel { display: contents; }
       #right-panel > *:not(#btnStartNew):not(#btnViewLB) { display: none !important; }
       /* Both idle CTAs sit side-by-side, centered around the viewport
@@ -1967,7 +1979,7 @@ button:disabled { opacity: .5; cursor: not-allowed; }
 
     <!-- Top bar: whitepaper (left) + wallet (right) -->
     <div class="landing-topbar">
-      <a class="topbar-link" id="btnWhitepaper" href="Copper%20Rush%20%E2%80%94%20Game%20Design%20Document%20%28v1%29.pdf" target="_blank" rel="noopener">Whitepaper</a>
+      <a class="topbar-link" id="btnDocs" href="docs.html" target="_blank" rel="noopener">Docs</a>
       <div id="wallet-area">
         <div id="walletInstallHint" style="display:none;">
           Phantom not found. <a href="https://phantom.app" target="_blank">Install</a>

@@ -1,0 +1,2348 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover" />
+  <meta name="robots" content="noindex,nofollow" />
+  <link rel="icon" href="data:,">
+  <title>Copper Rush — Docs</title>
+  <style>
+    :root {
+      --bg: #0b0f14;
+      --bg-elev: #101720;
+      --bg-card: #131c26;
+      --border: rgba(255,255,255,0.08);
+      --border-strong: rgba(255,255,255,0.16);
+      --text: #e6eef8;
+      --text-dim: #a4b1c2;
+      --accent: #ffcc66;
+      --accent-soft: rgba(255,204,102,0.10);
+      --accent-border: rgba(255,204,102,0.35);
+      --green: #7ee787;
+      --diamond: #7dd3fc;
+    }
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+      -webkit-font-smoothing: antialiased;
+      min-height: 100%;
+    }
+    body {
+      background:
+        radial-gradient(900px 500px at 15% -10%, rgba(255,204,102,0.06), transparent 60%),
+        radial-gradient(900px 500px at 85% 110%, rgba(125,211,252,0.05), transparent 60%),
+        var(--bg);
+      overflow-x: hidden;
+    }
+    /* Responsive safety net for embedded media */
+    img, svg { max-width: 100%; height: auto; }
+
+    /* Top bar */
+    .topbar {
+      position: sticky;
+      top: 0;
+      z-index: 20;
+      background: rgba(11,15,20,0.85);
+      backdrop-filter: blur(8px);
+      border-bottom: 1px solid var(--border);
+      padding: 12px 20px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+    .back-link {
+      color: var(--text-dim);
+      text-decoration: none;
+      font-size: 13px;
+      letter-spacing: 0.5px;
+      padding: 6px 10px;
+      border-radius: 8px;
+      transition: color 0.15s, background 0.15s;
+    }
+    .back-link:hover { color: var(--text); background: rgba(255,255,255,0.05); }
+    .brand {
+      font-size: 14px;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: var(--accent);
+      font-weight: 600;
+    }
+
+    /* Tabs */
+    .tabs {
+      display: flex;
+      gap: 6px;
+      padding: 18px 20px 0;
+      max-width: 960px;
+      margin: 0 auto;
+      flex-wrap: wrap;
+    }
+    .tab {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--text-dim);
+      font-family: inherit;
+      font-size: 13px;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      padding: 10px 16px;
+      border-radius: 10px 10px 0 0;
+      border-bottom-color: transparent;
+      cursor: pointer;
+      transition: color 0.15s, background 0.15s, border-color 0.15s;
+    }
+    .tab:hover { color: var(--text); background: rgba(255,255,255,0.03); }
+    .tab.active {
+      color: var(--accent);
+      background: var(--bg-elev);
+      border-color: var(--border-strong);
+      border-bottom-color: var(--bg-elev);
+    }
+
+    /* Panels */
+    .panels {
+      max-width: 1120px;
+      margin: 0 auto 60px;
+      padding: 0 20px;
+    }
+    .panel {
+      display: none;
+      background: var(--bg-elev);
+      border: 1px solid var(--border-strong);
+      border-radius: 0 12px 12px 12px;
+      padding: 28px;
+    }
+    .panel.active { display: block; }
+
+    /* Free Mode layout: sidebar (nav only) + single visible category panel */
+    .free-layout {
+      display: grid;
+      grid-template-columns: 260px 1fr;
+      gap: 28px;
+      align-items: start;
+    }
+    .free-side {
+      position: sticky;
+      top: 90px;
+    }
+    .side-list {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .side-item {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 12px;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      color: var(--text);
+      font-family: inherit;
+      font-size: 13px;
+      text-align: left;
+      cursor: pointer;
+      transition: border-color 0.15s, color 0.15s, background 0.15s;
+    }
+    .side-item:hover { border-color: var(--border-strong); }
+    .side-item.active {
+      color: var(--green);
+      border-color: rgba(126,231,135,0.35);
+      background: rgba(126,231,135,0.06);
+    }
+    .side-icon {
+      font-size: 16px;
+      width: 20px;
+      text-align: center;
+      line-height: 1;
+    }
+    .side-name { flex: 1; }
+    .side-chev {
+      font-size: 10px;
+      color: var(--text-dim);
+      transition: color 0.15s, transform 0.15s;
+    }
+    .side-item.active .side-chev {
+      color: var(--green);
+      transform: translateX(2px);
+    }
+
+    /* Right column: only the active category panel is visible */
+    .guide-content { min-height: 360px; }
+    .guide-panel { display: none; }
+    .guide-panel.active {
+      display: block;
+      animation: fadeIn 0.18s ease-out;
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(4px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    .guide-panel-head {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      margin: 0 0 18px;
+      padding-bottom: 14px;
+      border-bottom: 1px solid var(--border);
+    }
+    .guide-panel-icon {
+      font-size: 22px;
+      line-height: 1;
+      width: 44px;
+      height: 44px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      background: var(--accent-soft);
+      border: 1px solid var(--accent-border);
+      border-radius: 10px;
+      color: var(--accent);
+      flex-shrink: 0;
+    }
+    .guide-panel-title {
+      margin: 0;
+      font-size: 22px;
+      letter-spacing: 0.3px;
+      color: var(--text);
+      font-weight: 600;
+    }
+    .guide-panel-body {
+      color: var(--text);
+      font-size: 14.5px;
+      line-height: 1.7;
+    }
+    .guide-panel-body p { margin: 12px 0; }
+    .guide-panel-body p:first-child { margin-top: 0; }
+    .guide-panel-body strong { color: var(--accent); font-weight: 600; }
+    .guide-panel-body ul { margin: 10px 0; padding-left: 22px; }
+    .guide-panel-body li { margin: 6px 0; }
+    .guide-sub {
+      font-size: 12px;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      color: var(--text-dim);
+      margin: 18px 0 8px;
+    }
+    .guide-sub:first-child { margin-top: 0; }
+
+    /* ============================================================
+       HERO SECTIONS — game-guide visuals above each category's text
+       ============================================================ */
+    .hero {
+      margin: 0 0 22px;
+      padding: 22px;
+      background:
+        radial-gradient(600px 200px at 50% 0%, rgba(255,204,102,0.04), transparent 70%),
+        var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      overflow: hidden;
+    }
+
+    /* Hero: in-game scene (What is Copper Rush?, Gas) — SVG mockups drawn
+       with the game's actual palette (miner overalls, hard hat, headlamp,
+       toxic gas blobs) so it reads as a real screenshot. */
+    .hero-scene {
+      width: 100%;
+      height: 200px;
+      border-radius: 10px;
+      border: 1px solid var(--border-strong);
+      background: linear-gradient(135deg, #14100a 0%, #0b0f14 100%);
+      overflow: hidden;
+    }
+    .hero-scene svg { width: 100%; height: 100%; display: block; }
+
+    /* Hero: vertical flow (Objective) */
+    .hero-flow {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+    }
+    .hero-step {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding: 12px 22px;
+      background: rgba(255,255,255,0.03);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      min-width: 260px;
+      justify-content: flex-start;
+    }
+    .hero-step-icon {
+      font-size: 22px;
+      line-height: 1;
+      width: 28px;
+      text-align: center;
+    }
+    .hero-step-label { font-weight: 600; font-size: 14px; color: var(--text); }
+    .hero-arrow {
+      color: var(--accent);
+      font-size: 20px;
+      line-height: 1;
+    }
+
+    /* Hero: pair cards (Controls, Power-ups) */
+    .hero-pair {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+    }
+    .hero-tile {
+      background: rgba(255,255,255,0.02);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 22px 18px;
+      text-align: center;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+    }
+    .hero-tile-title {
+      font-size: 13px;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      color: var(--accent);
+      font-weight: 700;
+      margin: 0;
+    }
+    .hero-tile-visual {
+      font-size: 40px;
+      line-height: 1;
+    }
+    .hero-tile-desc {
+      font-size: 12.5px;
+      color: var(--text-dim);
+      margin: 0;
+      line-height: 1.5;
+    }
+
+    /* Keycaps (Controls Desktop) */
+    .keycap {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 32px;
+      height: 32px;
+      padding: 0 10px;
+      background: linear-gradient(180deg, #1e2731, #131a22);
+      border: 1px solid var(--border-strong);
+      border-bottom: 2px solid rgba(0,0,0,0.5);
+      border-radius: 6px;
+      font-weight: 700;
+      font-size: 13px;
+      color: var(--text);
+      font-family: ui-monospace, Menlo, Consolas, monospace;
+    }
+    .keycap-row { display: flex; gap: 6px; justify-content: center; align-items: center; }
+    .keycap-desc {
+      font-size: 11px;
+      color: var(--text-dim);
+      margin-left: 8px;
+      letter-spacing: 0.5px;
+    }
+
+    /* Joystick + power-up buttons (Controls Mobile) */
+    .mobile-controls-viz {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 26px;
+    }
+    .joystick-viz {
+      width: 60px;
+      height: 60px;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.04);
+      border: 2px solid var(--border-strong);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .joystick-viz::after {
+      content: "";
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      background: rgba(255,204,102,0.5);
+      border: 1px solid var(--accent);
+      box-shadow: 0 0 12px rgba(255,204,102,0.4);
+    }
+    .pu-buttons { display: flex; flex-direction: column; gap: 8px; }
+    .pu-button {
+      width: 34px;
+      height: 34px;
+      border-radius: 50%;
+      background: rgba(126,231,135,0.1);
+      border: 1px solid rgba(126,231,135,0.4);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 15px;
+    }
+
+    /* Hero: single big focus (Copper) */
+    .hero-focus {
+      display: flex;
+      align-items: center;
+      gap: 24px;
+    }
+    .hero-focus-icon {
+      font-size: 76px;
+      line-height: 1;
+      filter: drop-shadow(0 0 24px rgba(255,150,50,0.5));
+      flex-shrink: 0;
+    }
+    .hero-focus-tag {
+      background: var(--accent-soft);
+      border: 1px solid var(--accent-border);
+      border-radius: 12px;
+      padding: 16px 20px;
+      flex: 1;
+    }
+    .hero-focus-eyebrow {
+      font-size: 11px;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin: 0 0 6px;
+      font-weight: 700;
+    }
+    .hero-focus-title {
+      font-size: 17px;
+      color: var(--text);
+      margin: 0;
+      font-weight: 600;
+    }
+
+    /* Hero: 4 big diamond cards (Diamonds) */
+    .hero-diamonds {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 12px;
+    }
+    .hero-diamond {
+      text-align: center;
+      padding: 20px 12px;
+      background: rgba(255,255,255,0.02);
+      border: 1px solid var(--border);
+      border-top: 3px solid var(--dia-color);
+      border-radius: 10px;
+    }
+    .hero-diamond-icon {
+      font-size: 36px;
+      color: var(--dia-color);
+      text-shadow: 0 0 16px var(--dia-color);
+      line-height: 1;
+      margin-bottom: 10px;
+    }
+    .hero-diamond-name {
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--dia-color);
+      margin: 0 0 4px;
+      letter-spacing: 0.5px;
+    }
+    .hero-diamond-eff {
+      font-size: 11.5px;
+      color: var(--text-dim);
+      margin: 0;
+      line-height: 1.5;
+      letter-spacing: 0.3px;
+    }
+
+    /* Hero: combo meter + frenzy badge (Combo & Frenzy) */
+    .hero-combo {
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+      align-items: center;
+    }
+    .combo-meter-wrap { width: 100%; }
+    .combo-meter-label {
+      display: flex;
+      justify-content: space-between;
+      font-size: 11px;
+      color: var(--text-dim);
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      margin-bottom: 6px;
+      font-weight: 600;
+    }
+    .combo-meter-label span:last-child { color: var(--accent); }
+    .combo-meter {
+      width: 100%;
+      height: 20px;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      overflow: hidden;
+    }
+    .combo-meter-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #ffcc66 0%, #ff9040 50%, #ff5544 100%);
+      border-radius: 999px;
+      animation: comboPulse 3s ease-in-out infinite;
+    }
+    @keyframes comboPulse {
+      0%, 100% { width: 55%; }
+      50% { width: 90%; }
+    }
+    .frenzy-badge {
+      padding: 14px 30px;
+      background: linear-gradient(135deg, rgba(255,85,68,0.18), rgba(255,204,102,0.18));
+      border: 1px solid rgba(255,85,68,0.5);
+      border-radius: 12px;
+      font-size: 24px;
+      font-weight: 800;
+      letter-spacing: 6px;
+      color: #ff5544;
+      text-shadow: 0 0 14px rgba(255,85,68,0.8);
+      animation: frenzyPulse 1.6s ease-in-out infinite;
+    }
+    @keyframes frenzyPulse {
+      0%, 100% { transform: scale(1); box-shadow: 0 0 20px rgba(255,85,68,0.2); }
+      50% { transform: scale(1.03); box-shadow: 0 0 32px rgba(255,85,68,0.4); }
+    }
+
+    /* Hero: score formula (Score) */
+    .hero-formula {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: stretch;
+      justify-content: center;
+      gap: 8px;
+    }
+    .formula-part {
+      background: rgba(255,255,255,0.03);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px 10px;
+      font-size: 11px;
+      color: var(--text-dim);
+      text-align: center;
+      min-width: 84px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+      font-weight: 600;
+    }
+    .formula-part-icon { font-size: 22px; line-height: 1; }
+    .formula-op {
+      color: var(--accent);
+      font-size: 20px;
+      font-weight: 700;
+      align-self: center;
+    }
+    .formula-result {
+      background: var(--accent-soft);
+      border: 1px solid var(--accent-border);
+      border-radius: 8px;
+      padding: 12px 18px;
+      color: var(--accent);
+      font-weight: 800;
+      font-size: 12px;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    /* Hero: mutator game cards (Daily Mutator) */
+    .hero-mutators {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 12px;
+    }
+    .hero-mut-card {
+      background:
+        linear-gradient(180deg, rgba(0,0,0,0) 60%, rgba(0,0,0,0.2)),
+        rgba(255,255,255,0.02);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 18px 16px;
+      position: relative;
+      overflow: hidden;
+    }
+    .hero-mut-card::before {
+      content: "";
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 3px;
+      background: var(--mut-c);
+    }
+    .hero-mut-card::after {
+      content: "";
+      position: absolute;
+      top: -20px; right: -20px;
+      width: 80px; height: 80px;
+      background: var(--mut-c);
+      opacity: 0.08;
+      border-radius: 50%;
+      filter: blur(20px);
+    }
+    .hero-mut-icon {
+      font-size: 32px;
+      line-height: 1;
+      margin-bottom: 10px;
+      display: block;
+      position: relative;
+    }
+    .hero-mut-name {
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--mut-c);
+      margin: 0 0 6px;
+      letter-spacing: 0.3px;
+      position: relative;
+    }
+    .hero-mut-desc {
+      font-size: 12.5px;
+      color: var(--text);
+      margin: 0 0 8px;
+      line-height: 1.5;
+      position: relative;
+    }
+    .hero-mut-eff {
+      font-size: 11.5px;
+      color: var(--text-dim);
+      margin: 0;
+      line-height: 1.5;
+      position: relative;
+    }
+
+    /* Hero: mock leaderboard (Leaderboards) */
+    .hero-lb {
+      background: rgba(0,0,0,0.25);
+      border: 1px solid var(--border-strong);
+      border-radius: 10px;
+      padding: 14px 16px;
+    }
+    .lb-mock-tabs {
+      display: flex;
+      gap: 4px;
+      margin-bottom: 12px;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 10px;
+      flex-wrap: wrap;
+    }
+    .lb-mock-tab {
+      font-size: 10.5px;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+      padding: 5px 10px;
+      border-radius: 6px;
+      color: var(--text-dim);
+      font-weight: 600;
+    }
+    .lb-mock-tab.active {
+      color: var(--green);
+      background: rgba(126,231,135,0.1);
+    }
+    .lb-mock-row {
+      display: grid;
+      grid-template-columns: 28px 1fr auto;
+      gap: 12px;
+      align-items: center;
+      padding: 9px 6px;
+      border-bottom: 1px solid var(--border);
+      font-size: 13px;
+    }
+    .lb-mock-row:last-child { border-bottom: none; }
+    .lb-mock-rank {
+      color: var(--accent);
+      font-weight: 700;
+      text-align: center;
+      font-family: ui-monospace, Menlo, Consolas, monospace;
+    }
+    .lb-mock-name { color: var(--text); }
+    .lb-mock-score {
+      color: var(--text-dim);
+      font-variant-numeric: tabular-nums;
+      font-family: ui-monospace, Menlo, Consolas, monospace;
+      font-size: 12.5px;
+    }
+    .lb-mock-row.you {
+      background: rgba(126,231,135,0.05);
+      border-radius: 6px;
+      border-bottom-color: rgba(126,231,135,0.15);
+    }
+    .lb-mock-row.you .lb-mock-name { color: var(--green); font-weight: 600; }
+
+    /* Hero: reward badges (Free Mode Rewards) */
+    .hero-rewards {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 12px;
+    }
+    .reward-badge {
+      text-align: center;
+      padding: 20px 14px;
+      background: rgba(126,231,135,0.05);
+      border: 1px solid rgba(126,231,135,0.3);
+      border-radius: 12px;
+    }
+    .reward-badge-icon {
+      font-size: 34px;
+      display: block;
+      margin-bottom: 10px;
+      line-height: 1;
+    }
+    .reward-badge-title {
+      font-size: 11.5px;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      color: var(--green);
+      font-weight: 700;
+      margin: 0;
+      line-height: 1.4;
+    }
+
+    /* ============================================================
+       ROADMAP — vertical mine progression path
+       ============================================================ */
+    .roadmap {
+      position: relative;
+      max-width: 720px;
+      margin: 0 auto;
+      padding: 24px 20px 20px;
+      background:
+        radial-gradient(circle at 12% 22%, rgba(255,204,102,0.05), transparent 45%),
+        radial-gradient(circle at 88% 78%, rgba(126,231,135,0.03), transparent 45%),
+        linear-gradient(180deg, transparent 0%, rgba(0,0,0,0.18) 100%);
+    }
+
+    /* Legend (top-left, matches reference) */
+    .roadmap-legend {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      padding: 10px 12px;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: rgba(0,0,0,0.28);
+      font-size: 10px;
+      letter-spacing: 1.4px;
+      text-transform: uppercase;
+      font-weight: 700;
+      width: fit-content;
+      margin: 0 0 18px;
+    }
+    .rm-legend-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--text);
+    }
+    .rm-legend-dot {
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      background: currentColor;
+      box-shadow: 0 0 6px currentColor;
+    }
+    .rm-legend-row.live    { color: #7ee787; }
+    .rm-legend-row.next    { color: #ffcc66; }
+    .rm-legend-row.planned { color: #6b7787; }
+    .rm-legend-row.planned .rm-legend-dot { box-shadow: none; opacity: 0.7; }
+
+    /* Surface / Deep Mine markers */
+    .roadmap-marker {
+      text-align: center;
+      font-size: 10px;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      color: var(--text-dim);
+      font-weight: 600;
+      padding: 4px 0 6px;
+      opacity: 0.75;
+    }
+    .roadmap-marker-top::before {
+      content: "\25B2";
+      display: block;
+      font-size: 11px;
+      margin-bottom: 4px;
+      opacity: 0.7;
+    }
+    .roadmap-marker-bottom {
+      opacity: 0.5;
+      padding: 6px 0 4px;
+    }
+    .roadmap-marker-bottom::after {
+      content: "\25BC";
+      display: block;
+      font-size: 11px;
+      margin-top: 4px;
+      opacity: 0.7;
+    }
+    .roadmap-footnote {
+      text-align: center;
+      font-size: 10px;
+      color: var(--text-dim);
+      opacity: 0.55;
+      margin-top: 12px;
+      font-style: italic;
+      letter-spacing: 0.3px;
+    }
+
+    /* Levels container */
+    .roadmap-levels {
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* One level: [node column | card] */
+    .rm-level {
+      position: relative;
+      display: grid;
+      grid-template-columns: 76px 1fr;
+      gap: 18px;
+      padding: 10px 0;
+      align-items: center;
+      min-height: 96px;
+    }
+    /* Segment BEFORE the node (from previous level to this node's center) */
+    .rm-level::before {
+      content: "";
+      position: absolute;
+      top: 0;
+      height: 50%;
+      left: 38px;
+      transform: translateX(-1px);
+      width: 2px;
+      background: var(--rm-seg-in, rgba(120,130,145,0.22));
+      z-index: 0;
+    }
+    /* Segment AFTER the node (from node center down to next level) */
+    .rm-level::after {
+      content: "";
+      position: absolute;
+      top: 50%;
+      bottom: 0;
+      left: 38px;
+      transform: translateX(-1px);
+      width: 2px;
+      background: var(--rm-seg-out, rgba(120,130,145,0.22));
+      z-index: 0;
+    }
+
+    /* Per-index segment colors (progression V0 -> V5) */
+    .rm-level[data-idx="0"] { --rm-seg-in: linear-gradient(180deg, transparent 0%, rgba(126,231,135,0.55) 100%); --rm-seg-out: rgba(126,231,135,0.75); }
+    .rm-level[data-idx="1"] { --rm-seg-in: linear-gradient(180deg, rgba(126,231,135,0.75), rgba(255,204,102,0.85)); --rm-seg-out: rgba(255,204,102,0.85); }
+    .rm-level[data-idx="2"] { --rm-seg-in: linear-gradient(180deg, rgba(255,204,102,0.75), rgba(120,130,145,0.28)); --rm-seg-out: rgba(120,130,145,0.28); }
+    .rm-level[data-idx="3"] { --rm-seg-in: rgba(120,130,145,0.24); --rm-seg-out: rgba(120,130,145,0.22); }
+    .rm-level[data-idx="4"] { --rm-seg-in: rgba(120,130,145,0.22); --rm-seg-out: rgba(120,130,145,0.20); }
+    .rm-level[data-idx="5"] { --rm-seg-in: rgba(120,130,145,0.20); --rm-seg-out: linear-gradient(180deg, rgba(120,130,145,0.20), transparent); }
+
+    /* Node column (holds the octagon) */
+    .rm-nodecol {
+      grid-column: 1;
+      position: relative;
+      z-index: 2;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    /* Octagonal node — outer = colored border, inner = bg-elev fill */
+    .rm-node {
+      width: 62px;
+      height: 62px;
+      clip-path: polygon(30% 0, 70% 0, 100% 30%, 100% 70%, 70% 100%, 30% 100%, 0 70%, 0 30%);
+      background: var(--rm-color, #6b7787);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      filter: drop-shadow(0 0 6px var(--rm-glow, transparent));
+      transition: filter 0.2s;
+    }
+    .rm-node-inner {
+      width: calc(100% - 4px);
+      height: calc(100% - 4px);
+      clip-path: polygon(30% 0, 70% 0, 100% 30%, 100% 70%, 70% 100%, 30% 100%, 0 70%, 0 30%);
+      background: var(--bg-elev);
+      color: var(--rm-color, #6b7787);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: ui-monospace, Menlo, Consolas, monospace;
+      font-size: 19px;
+      font-weight: 800;
+      letter-spacing: 0.5px;
+    }
+
+    /* Compact card */
+    .rm-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 12px 14px;
+      position: relative;
+      transition: border-color 0.15s, box-shadow 0.15s, background 0.2s;
+    }
+    .rm-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin: 0 0 8px;
+      flex-wrap: wrap;
+    }
+    .rm-title {
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--text);
+      margin: 0;
+      letter-spacing: 0.6px;
+      text-transform: uppercase;
+    }
+    .rm-status {
+      display: inline-block;
+      font-size: 9px;
+      letter-spacing: 1.4px;
+      text-transform: uppercase;
+      padding: 3px 8px;
+      border-radius: 5px;
+      background: var(--rm-status-bg, rgba(107,119,135,0.1));
+      color: var(--rm-color, #6b7787);
+      border: 1px solid var(--rm-color, #6b7787);
+      font-weight: 700;
+    }
+    .rm-lock {
+      color: var(--rm-color, #6b7787);
+      opacity: 0.55;
+      font-size: 11px;
+      margin-left: auto;
+    }
+    .rm-list {
+      margin: 0;
+      padding: 0;
+      list-style: none;
+      font-size: 12px;
+      color: var(--text-dim);
+      line-height: 1.5;
+    }
+    .rm-list li {
+      padding: 1px 0 1px 14px;
+      position: relative;
+    }
+    .rm-list li::before {
+      content: "\25B8";
+      position: absolute;
+      left: 0;
+      top: 1px;
+      color: var(--rm-color, #6b7787);
+      opacity: 0.7;
+      font-size: 10px;
+    }
+
+    /* Status variants */
+    .rm-level.status-live {
+      --rm-color: #7ee787;
+      --rm-status-bg: rgba(126,231,135,0.14);
+      --rm-glow: rgba(126,231,135,0.4);
+    }
+    .rm-level.status-next {
+      --rm-color: #ffcc66;
+      --rm-status-bg: rgba(255,204,102,0.18);
+      --rm-glow: rgba(255,204,102,0.55);
+    }
+    .rm-level.status-planned {
+      --rm-color: #6b7787;
+      --rm-status-bg: rgba(107,119,135,0.1);
+      --rm-glow: transparent;
+    }
+    .rm-level.status-planned .rm-card { opacity: 0.72; }
+    .rm-level.status-planned .rm-node { opacity: 0.7; }
+
+    /* V0 LIVE — calm green glow */
+    .rm-level.status-live .rm-node {
+      filter: drop-shadow(0 0 8px rgba(126,231,135,0.35));
+    }
+
+    /* V1 HERO — pulsing copper glow, gradient card bg */
+    .rm-level.status-next .rm-node {
+      animation: rmPulse 3s ease-in-out infinite;
+    }
+    .rm-level.status-next .rm-card {
+      border-color: rgba(255,204,102,0.4);
+      background:
+        linear-gradient(135deg, rgba(255,204,102,0.06) 0%, rgba(255,204,102,0) 65%),
+        var(--bg-card);
+      box-shadow: 0 0 24px rgba(255,204,102,0.09);
+    }
+    .rm-level.status-next .rm-status {
+      background: rgba(255,204,102,0.22);
+      color: #ffdd8a;
+    }
+    @keyframes rmPulse {
+      0%, 100% { filter: drop-shadow(0 0 8px rgba(255,204,102,0.35)); }
+      50%      { filter: drop-shadow(0 0 20px rgba(255,204,102,0.7)); }
+    }
+
+    /* Hover — desktop pointer devices only */
+    @media (hover: hover) {
+      .rm-card { cursor: default; }
+      .rm-level:hover .rm-card {
+        border-color: var(--rm-color, var(--border-strong));
+        box-shadow: 0 0 22px var(--rm-glow, rgba(255,255,255,0.05));
+      }
+      .rm-level.status-planned:hover .rm-card { opacity: 0.95; }
+      .rm-level.status-planned:hover .rm-node { opacity: 0.95; }
+    }
+
+    /* ============================================================
+       PAID MODE — flow preview (Coming in V1)
+       ============================================================ */
+    .paid {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 8px 0 0;
+    }
+
+    /* Hero header */
+    .paid-hero {
+      text-align: center;
+      padding: 8px 0 28px;
+    }
+    .paid-badge {
+      display: inline-block;
+      font-size: 10.5px;
+      letter-spacing: 2.5px;
+      text-transform: uppercase;
+      font-weight: 700;
+      padding: 5px 12px;
+      border-radius: 999px;
+      color: var(--accent);
+      background: var(--accent-soft);
+      border: 1px solid var(--accent-border);
+      margin-bottom: 14px;
+    }
+    .paid-title {
+      font-size: 34px;
+      font-weight: 800;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin: 0 0 12px;
+      text-shadow: 0 0 24px rgba(255,204,102,0.25);
+      font-family: ui-monospace, Menlo, Consolas, monospace;
+    }
+    .paid-sub {
+      font-size: 14px;
+      color: var(--text);
+      line-height: 1.55;
+      margin: 0 auto 10px;
+      max-width: 480px;
+    }
+    .paid-tag {
+      font-size: 12px;
+      color: var(--text-dim);
+      margin: 0 auto;
+      opacity: 0.85;
+      max-width: 480px;
+    }
+    .paid-tag em {
+      font-style: normal;
+      color: var(--accent);
+    }
+
+    /* Flow container */
+    .paid-flow {
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 20px 20px 20px;
+      gap: 0;
+    }
+    /* Children stack above the SVG return overlay */
+    .paid-flow > *:not(.pf-returns):not(.pf-return-arrow) {
+      position: relative;
+      z-index: 1;
+    }
+
+    /* Return-flow SVG overlay (Leaderboard & Treasury -> Player) */
+    .pf-returns {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 0;
+      overflow: visible;
+    }
+    .pf-line {
+      fill: none;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+    .pf-line-left {
+      stroke: #ffcc66;
+      stroke-width: 1.5;
+      opacity: 0.55;
+      filter: drop-shadow(0 0 3px rgba(255, 204, 102, 0.4));
+    }
+    .pf-line-right {
+      stroke: #7ee787;
+      stroke-width: 1.5;
+      opacity: 0.55;
+      filter: drop-shadow(0 0 3px rgba(126, 231, 135, 0.35));
+    }
+    /* Arrowheads (CSS triangles, pixel-stable) */
+    .pf-return-arrow {
+      position: absolute;
+      width: 0;
+      height: 0;
+      z-index: 2;
+      opacity: 0.9;
+      pointer-events: none;
+    }
+    .pf-return-arrow-left {
+      border-top: 5px solid transparent;
+      border-bottom: 5px solid transparent;
+      border-left: 8px solid #ffcc66;
+      top: calc(7% - 5px);
+      left: calc(44% - 8px);
+      filter: drop-shadow(0 0 3px rgba(255, 204, 102, 0.5));
+    }
+    .pf-return-arrow-right {
+      border-top: 5px solid transparent;
+      border-bottom: 5px solid transparent;
+      border-right: 8px solid #7ee787;
+      top: calc(7% - 5px);
+      left: 56%;
+      filter: drop-shadow(0 0 3px rgba(126, 231, 135, 0.5));
+    }
+
+    /* Small "returns to player" note — mobile only, on the 2 return-flow cards */
+    .pf-return-note {
+      display: none;
+      font-size: 10px;
+      color: var(--pf-color);
+      font-weight: 700;
+      letter-spacing: 0.6px;
+      text-transform: uppercase;
+      margin-top: 4px;
+      opacity: 0.9;
+    }
+
+    /* Node — generic */
+    .pf-node {
+      position: relative;
+      background: var(--bg-elev);
+      border: 1px solid var(--border-strong);
+      border-radius: 12px;
+      padding: 10px 22px;
+      text-align: center;
+      font-family: ui-monospace, Menlo, Consolas, monospace;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--text-dim);
+    }
+
+    /* PLAY node — discreet */
+    .pf-play {
+      color: var(--text-dim);
+      opacity: 0.9;
+      background: transparent;
+      border-color: var(--border);
+      padding: 6px 18px;
+      font-size: 11px;
+      letter-spacing: 3px;
+    }
+
+    /* Vertical arrow between nodes */
+    .pf-arrow {
+      position: relative;
+      width: 2px;
+      height: 34px;
+      background: linear-gradient(180deg, rgba(255,204,102,0.15) 0%, rgba(255,204,102,0.75) 100%);
+      margin: 6px 0;
+    }
+    .pf-arrow::after {
+      content: "";
+      position: absolute;
+      bottom: -1px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 0;
+      height: 0;
+      border-left: 5px solid transparent;
+      border-right: 5px solid transparent;
+      border-top: 7px solid var(--accent);
+      opacity: 0.85;
+    }
+    .pf-arrow.dim {
+      background: linear-gradient(180deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.15) 100%);
+    }
+    .pf-arrow.dim::after { border-top-color: rgba(255,255,255,0.35); }
+
+    /* ENTRY FEE — hero node */
+    .pf-entry {
+      padding: 18px 34px;
+      border: 1.5px solid var(--accent-border);
+      background:
+        linear-gradient(135deg, rgba(255,204,102,0.08) 0%, rgba(255,204,102,0) 65%),
+        var(--bg-elev);
+      border-radius: 14px;
+      box-shadow:
+        0 0 0 1px rgba(255,204,102,0.05),
+        0 0 32px rgba(255,204,102,0.12);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+      min-width: 220px;
+    }
+    .pf-entry-icon {
+      width: 44px;
+      height: 44px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      filter: drop-shadow(0 0 10px rgba(255,204,102,0.5));
+    }
+    .pf-entry-icon svg { display: block; }
+    .pf-entry-title {
+      font-family: ui-monospace, Menlo, Consolas, monospace;
+      font-size: 16px;
+      letter-spacing: 3px;
+      color: var(--accent);
+      font-weight: 800;
+      text-transform: uppercase;
+    }
+    .pf-entry-sub {
+      font-size: 11px;
+      color: var(--text-dim);
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      font-weight: 500;
+      opacity: 0.75;
+    }
+
+    /* SPLIT — central circular node */
+    .pf-split {
+      width: 96px;
+      height: 96px;
+      border-radius: 50%;
+      background:
+        radial-gradient(circle at 50% 50%, rgba(255,204,102,0.15) 0%, rgba(255,204,102,0) 65%),
+        var(--bg-elev);
+      border: 2px solid var(--accent);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--accent);
+      font-family: ui-monospace, Menlo, Consolas, monospace;
+      font-size: 13px;
+      font-weight: 800;
+      letter-spacing: 2.5px;
+      text-transform: uppercase;
+      position: relative;
+      box-shadow:
+        0 0 0 4px rgba(255,204,102,0.05),
+        0 0 24px rgba(255,204,102,0.28),
+        inset 0 0 12px rgba(255,204,102,0.15);
+      animation: pfSplitPulse 4s ease-in-out infinite;
+    }
+    @keyframes pfSplitPulse {
+      0%, 100% { box-shadow: 0 0 0 4px rgba(255,204,102,0.05), 0 0 20px rgba(255,204,102,0.22), inset 0 0 12px rgba(255,204,102,0.15); }
+      50%      { box-shadow: 0 0 0 4px rgba(255,204,102,0.08), 0 0 34px rgba(255,204,102,0.45), inset 0 0 16px rgba(255,204,102,0.22); }
+    }
+
+    /* Branches connector — CSS tree from SPLIT to 4 destinations */
+    .pf-branches {
+      position: relative;
+      width: 100%;
+      height: 46px;
+      margin-top: 0;
+    }
+    /* Vertical stub coming down from SPLIT */
+    .pf-branches::before {
+      content: "";
+      position: absolute;
+      top: 0;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 2px;
+      height: 22px;
+      background: var(--accent);
+      opacity: 0.7;
+      box-shadow: 0 0 8px rgba(255,204,102,0.4);
+    }
+    /* Horizontal bar linking all 4 columns */
+    .pf-branches::after {
+      content: "";
+      position: absolute;
+      top: 22px;
+      left: 12.5%;
+      right: 12.5%;
+      height: 2px;
+      background: linear-gradient(90deg, rgba(255,204,102,0.35) 0%, var(--accent) 25%, var(--accent) 75%, rgba(255,204,102,0.35) 100%);
+      box-shadow: 0 0 8px rgba(255,204,102,0.35);
+    }
+    /* 4 vertical drops from horizontal bar to each destination */
+    .pf-branch-drops {
+      position: absolute;
+      inset: 22px 0 0 0;
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+    }
+    .pf-branch-drops span {
+      position: relative;
+      height: 24px;
+    }
+    .pf-branch-drops span::before {
+      content: "";
+      position: absolute;
+      top: 0;
+      bottom: -2px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 2px;
+      background: var(--accent);
+      opacity: 0.6;
+    }
+    .pf-branch-drops span::after {
+      content: "";
+      position: absolute;
+      bottom: -3px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 0;
+      height: 0;
+      border-left: 4px solid transparent;
+      border-right: 4px solid transparent;
+      border-top: 6px solid var(--accent);
+      opacity: 0.75;
+    }
+
+    /* Destinations grid */
+    .pf-destinations {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+      width: 100%;
+      padding: 4px 0 0;
+    }
+    .pf-dest {
+      --pf-color: #ffcc66;
+      --pf-glow: rgba(255,204,102,0.22);
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 16px 12px 14px;
+      text-align: center;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+      transition: border-color 0.15s, box-shadow 0.15s, transform 0.15s;
+    }
+    .pf-dest-icon {
+      font-size: 26px;
+      line-height: 1;
+      filter: drop-shadow(0 0 8px var(--pf-glow));
+    }
+    .pf-dest-title {
+      font-family: ui-monospace, Menlo, Consolas, monospace;
+      font-size: 11px;
+      letter-spacing: 1.8px;
+      text-transform: uppercase;
+      font-weight: 800;
+      color: var(--pf-color);
+      line-height: 1.3;
+    }
+    .pf-dest-desc {
+      font-size: 11.5px;
+      color: var(--text-dim);
+      line-height: 1.45;
+      margin: 0;
+    }
+
+    /* Per-destination color accents */
+    .pf-dest.leader   { --pf-color: #ffcc66; --pf-glow: rgba(255,204,102,0.28); }
+    .pf-dest.treasury { --pf-color: #7ee787; --pf-glow: rgba(126,231,135,0.28); }
+    .pf-dest.burn     { --pf-color: #ff9a5c; --pf-glow: rgba(255,154,92,0.28); }
+    .pf-dest.dev      { --pf-color: #8fb3d9; --pf-glow: rgba(143,179,217,0.24); }
+
+    @media (hover: hover) {
+      .pf-dest:hover {
+        border-color: var(--pf-color);
+        box-shadow: 0 0 22px var(--pf-glow);
+        transform: translateY(-2px);
+      }
+    }
+
+    /* Disclaimer */
+    .paid-disclaimer {
+      text-align: center;
+      font-size: 10.5px;
+      color: var(--text-dim);
+      opacity: 0.55;
+      font-style: italic;
+      letter-spacing: 0.3px;
+      margin: 24px auto 0;
+      padding: 0 12px;
+    }
+
+    /* Paid Mode responsive — vertical stack under 700px */
+    @media (max-width: 700px) {
+      .paid { padding: 4px 4px 0; }
+      .paid-title { font-size: 26px; letter-spacing: 2px; }
+      .paid-sub   { font-size: 13px; }
+      .paid-tag   { font-size: 11.5px; }
+      .paid-flow  { padding: 12px 0 8px; }
+      .pf-entry   { padding: 14px 22px; min-width: 0; width: 100%; max-width: 300px; }
+      .pf-entry-icon { width: 38px; height: 38px; }
+      .pf-entry-title { font-size: 14px; letter-spacing: 2px; }
+      .pf-split { width: 78px; height: 78px; font-size: 11px; letter-spacing: 2px; }
+      /* Hide horizontal branch bar — flow becomes purely vertical */
+      .pf-branches { display: none; }
+      /* Hide desktop return SVG overlay + arrowheads on mobile */
+      .pf-returns,
+      .pf-return-arrow { display: none; }
+      /* Show textual return indicator on Leaderboard & Treasury cards */
+      .pf-dest.leader .pf-return-note,
+      .pf-dest.treasury .pf-return-note { display: inline-block; }
+      /* Destinations stack vertically with individual arrows between them */
+      .pf-destinations {
+        grid-template-columns: 1fr;
+        gap: 0;
+        padding-top: 0;
+        max-width: 320px;
+        margin: 0 auto;
+      }
+      .pf-dest {
+        padding: 12px 14px;
+        margin-top: 26px;
+        position: relative;
+      }
+      /* Arrow drawn above each stacked destination */
+      .pf-dest::before {
+        content: "";
+        position: absolute;
+        top: -22px;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 2px;
+        height: 18px;
+        background: linear-gradient(180deg, rgba(255,204,102,0.15), var(--pf-color));
+        opacity: 0.7;
+      }
+      .pf-dest::after {
+        content: "";
+        position: absolute;
+        top: -6px;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 0;
+        height: 0;
+        border-left: 4px solid transparent;
+        border-right: 4px solid transparent;
+        border-top: 6px solid var(--pf-color);
+        opacity: 0.85;
+      }
+    }
+
+    /* Coming Soon centered card */
+    .cs-wrap {
+      display: flex;
+      justify-content: center;
+      padding: 40px 0;
+    }
+    .cs-card {
+      background: var(--bg-card);
+      border: 1px solid var(--accent-border);
+      border-radius: 16px;
+      padding: 40px 32px;
+      max-width: 420px;
+      width: 100%;
+      text-align: center;
+      position: relative;
+    }
+    .cs-badge {
+      display: inline-block;
+      font-size: 11px;
+      letter-spacing: 2px;
+      color: var(--accent);
+      background: var(--accent-soft);
+      border: 1px solid var(--accent-border);
+      padding: 4px 10px;
+      border-radius: 999px;
+      margin-bottom: 18px;
+    }
+    .cs-title {
+      font-size: 22px;
+      font-weight: 600;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin: 0 0 6px;
+    }
+    .cs-version {
+      font-size: 13px;
+      color: var(--text-dim);
+      margin: 0 0 18px;
+      letter-spacing: 0.5px;
+    }
+    .cs-desc {
+      font-size: 14px;
+      line-height: 1.6;
+      color: var(--text);
+      margin: 0;
+    }
+
+    /* Tablet + mobile: sidebar collapses into a vertical stacked menu on top */
+    @media (max-width: 900px) {
+      .free-layout { grid-template-columns: 1fr; gap: 18px; }
+      .free-side { position: static; }
+      .side-list {
+        flex-direction: column;
+        overflow-x: visible;
+        gap: 6px;
+        padding-bottom: 0;
+      }
+      .side-item {
+        flex: 1 1 auto;
+        width: 100%;
+        padding: 10px 12px;
+        font-size: 12.5px;
+      }
+      .side-chev { display: inline-block; margin-left: auto; }
+
+      /* iOS/Android render the 🪙 emoji as a silvery two-tone coin; tint it
+         copper on mobile so it matches the golden look Windows shows on
+         desktop. Filter works on emoji since they're rasterised glyphs. */
+      .side-item[data-target="s-copper"] .side-icon,
+      .guide-panel[data-id="s-copper"] .guide-panel-icon,
+      .guide-panel[data-id="s-copper"] .hero-focus-icon {
+        filter: sepia(0.9) saturate(2.4) hue-rotate(-10deg) brightness(1.05);
+      }
+    }
+
+    @media (max-width: 600px) {
+      .topbar { padding: 10px 14px; gap: 10px; }
+      .brand { font-size: 12px; letter-spacing: 1.5px; }
+      .tabs { padding: 14px 12px 0; gap: 4px; }
+      .tab { padding: 8px 12px; font-size: 12px; letter-spacing: 0.5px; }
+      .panels { padding: 0 12px; margin-bottom: 40px; }
+      .panel { padding: 20px 16px; border-radius: 0 10px 10px 10px; }
+      .guide-panel-head { gap: 10px; margin-bottom: 14px; padding-bottom: 12px; }
+      .guide-panel-icon { font-size: 18px; width: 36px; height: 36px; border-radius: 8px; }
+      .guide-panel-title { font-size: 18px; }
+      .guide-panel-body { font-size: 13.5px; line-height: 1.6; }
+      .hero { padding: 16px; }
+      .hero-pair { grid-template-columns: 1fr; }
+      .hero-focus { flex-direction: column; text-align: center; gap: 16px; }
+      .hero-focus-icon { font-size: 56px; }
+      .hero-scene { height: 170px; }
+      .hero-diamonds { grid-template-columns: repeat(2, 1fr); }
+      /* Roadmap: tighter spacing, smaller nodes */
+      .roadmap { padding: 18px 10px 14px; max-width: 100%; }
+      .roadmap-legend {
+        flex-direction: row;
+        flex-wrap: wrap;
+        gap: 10px 14px;
+        padding: 8px 10px;
+        font-size: 9.5px;
+        margin: 0 0 14px;
+      }
+      .rm-level {
+        grid-template-columns: 60px 1fr;
+        gap: 12px;
+        padding: 8px 0;
+        min-height: 84px;
+      }
+      .rm-level::before,
+      .rm-level::after { left: 30px; }
+      .rm-node { width: 52px; height: 52px; }
+      .rm-node-inner { font-size: 15px; }
+      .rm-card { padding: 10px 12px; }
+      .rm-title { font-size: 13px; letter-spacing: 0.4px; }
+      .rm-header { gap: 8px; margin-bottom: 6px; }
+      .rm-status { font-size: 8.5px; padding: 2px 7px; }
+      .rm-list { font-size: 11.5px; }
+      .hero-mutators { grid-template-columns: 1fr; }
+      .hero-step { min-width: 0; width: 100%; }
+      .frenzy-badge { font-size: 20px; letter-spacing: 4px; padding: 12px 22px; }
+      .cs-card { padding: 32px 20px; }
+      .cs-title { font-size: 18px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="topbar">
+    <a class="back-link" href="index.html">&larr; Back to Game</a>
+    <span class="brand">Copper Rush</span>
+  </div>
+
+  <nav class="tabs" role="tablist">
+    <button class="tab active" data-tab="free"    role="tab" aria-selected="true">Free Mode</button>
+    <button class="tab"        data-tab="paid"    role="tab" aria-selected="false">Paid Mode</button>
+    <button class="tab"        data-tab="roadmap" role="tab" aria-selected="false">Roadmap</button>
+  </nav>
+
+  <main class="panels">
+
+    <!-- Free Mode -->
+    <section class="panel active" data-panel="free" role="tabpanel">
+      <div class="free-layout">
+
+        <aside class="free-side">
+          <ul class="side-list">
+            <li><button class="side-item active" data-target="s-what"><span class="side-icon">&#127918;</span><span class="side-name">What is Copper Rush?</span><span class="side-chev">&#9654;</span></button></li>
+            <li><button class="side-item"        data-target="s-obj"><span class="side-icon">&#127919;</span><span class="side-name">Objective</span><span class="side-chev">&#9654;</span></button></li>
+            <li><button class="side-item"        data-target="s-ctrl"><span class="side-icon">&#127920;</span><span class="side-name">Controls</span><span class="side-chev">&#9654;</span></button></li>
+            <li><button class="side-item"        data-target="s-copper"><span class="side-icon">&#129689;</span><span class="side-name">Copper</span><span class="side-chev">&#9654;</span></button></li>
+            <li><button class="side-item"        data-target="s-diam"><span class="side-icon">&#128142;</span><span class="side-name">Diamonds</span><span class="side-chev">&#9654;</span></button></li>
+            <li><button class="side-item"        data-target="s-gas"><span class="side-icon">&#9762;&#65039;</span><span class="side-name">Gas</span><span class="side-chev">&#9654;</span></button></li>
+            <li><button class="side-item"        data-target="s-power"><span class="side-icon">&#9889;</span><span class="side-name">Power-ups</span><span class="side-chev">&#9654;</span></button></li>
+            <li><button class="side-item"        data-target="s-combo"><span class="side-icon">&#128293;</span><span class="side-name">Combo &amp; Frenzy</span><span class="side-chev">&#9654;</span></button></li>
+            <li><button class="side-item"        data-target="s-score"><span class="side-icon">&#127942;</span><span class="side-name">Score</span><span class="side-chev">&#9654;</span></button></li>
+            <li><button class="side-item"        data-target="s-mut"><span class="side-icon">&#127922;</span><span class="side-name">Daily Mutator</span><span class="side-chev">&#9654;</span></button></li>
+            <li><button class="side-item"        data-target="s-lb"><span class="side-icon">&#128202;</span><span class="side-name">Leaderboards</span><span class="side-chev">&#9654;</span></button></li>
+            <li><button class="side-item"        data-target="s-rew"><span class="side-icon">&#127873;</span><span class="side-name">Free Mode Rewards</span><span class="side-chev">&#9654;</span></button></li>
+          </ul>
+        </aside>
+
+        <div class="guide-content">
+
+          <!-- What is Copper Rush? -->
+          <article class="guide-panel active" data-id="s-what">
+            <header class="guide-panel-head">
+              <span class="guide-panel-icon">&#127918;</span>
+              <h2 class="guide-panel-title">What is Copper Rush?</h2>
+            </header>
+            <div class="guide-panel-body">
+              <div class="hero">
+                <div class="hero-scene">
+                  <svg viewBox="0 0 400 200" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid slice">
+                    <defs>
+                      <pattern id="stoneW" width="24" height="24" patternUnits="userSpaceOnUse">
+                        <rect width="24" height="24" fill="#1a1410"/>
+                        <circle cx="6" cy="7" r="1" fill="rgba(180,120,60,0.10)"/>
+                        <circle cx="18" cy="15" r="0.8" fill="rgba(180,120,60,0.07)"/>
+                        <circle cx="12" cy="20" r="0.6" fill="rgba(180,120,60,0.06)"/>
+                      </pattern>
+                      <radialGradient id="lampConeW" cx="30%" cy="50%">
+                        <stop offset="0%" stop-color="rgba(255,230,150,0.28)"/>
+                        <stop offset="100%" stop-color="rgba(255,230,150,0)"/>
+                      </radialGradient>
+                    </defs>
+                    <rect width="400" height="200" fill="url(#stoneW)"/>
+                    <!-- Headlamp cone reaching toward the copper -->
+                    <ellipse cx="270" cy="100" rx="110" ry="60" fill="url(#lampConeW)"/>
+                    <!-- Copper pickups ahead -->
+                    <g transform="translate(325, 92)">
+                      <circle r="9" fill="#c87828"/>
+                      <circle r="7" fill="#e8a040"/>
+                      <circle r="4" fill="#ffc060"/>
+                      <circle cx="-1.5" cy="-1.5" r="1.6" fill="rgba(255,240,180,0.85)"/>
+                    </g>
+                    <g transform="translate(355, 130)">
+                      <circle r="8" fill="#c87828"/>
+                      <circle r="6" fill="#e8a040"/>
+                      <circle r="3.2" fill="#ffc060"/>
+                      <circle cx="-1" cy="-1" r="1.2" fill="rgba(255,240,180,0.75)"/>
+                    </g>
+                    <g transform="translate(365, 68)">
+                      <circle r="7" fill="#c87828"/>
+                      <circle r="5.5" fill="#e8a040"/>
+                      <circle r="3" fill="#ffc060"/>
+                    </g>
+                    <!-- Miner trail dots (motion) -->
+                    <circle cx="175" cy="112" r="2" fill="rgba(255,230,150,0.18)"/>
+                    <circle cx="155" cy="114" r="1.6" fill="rgba(255,230,150,0.12)"/>
+                    <circle cx="138" cy="115" r="1.2" fill="rgba(255,230,150,0.08)"/>
+                    <!-- Miner (colors from copper-beta.html rendering) -->
+                    <g transform="translate(210, 108)">
+                      <!-- Body: brown overalls #6b4c2a -->
+                      <circle cx="0" cy="3" r="10" fill="#6b4c2a"/>
+                      <!-- Head: skin #e8c99b -->
+                      <circle cx="0" cy="-6" r="7" fill="#e8c99b"/>
+                      <!-- Hard hat: yellow #e8b830, dome + brim -->
+                      <path d="M -8 -9 A 8 8 0 0 1 8 -9 Z" fill="#e8b830"/>
+                      <rect x="-10" y="-10" width="20" height="3.5" fill="#e8b830"/>
+                      <!-- Headlamp -->
+                      <circle cx="0" cy="-13" r="2.6" fill="rgba(255,240,180,1)"/>
+                      <circle cx="0" cy="-13" r="1.3" fill="#fff"/>
+                      <!-- Pickaxe leaning toward copper -->
+                      <g transform="translate(9, 2) rotate(-45)">
+                        <rect x="-1" y="-14" width="2" height="20" fill="#6b4c2a"/>
+                        <path d="M -6 -16 L 6 -16 L 6 -13 L 4 -12 L -4 -12 L -6 -13 Z" fill="#8a8a8a"/>
+                        <path d="M -6 -16 L 6 -16 L 6 -14.5 L -6 -14.5 Z" fill="#a8a8a8"/>
+                      </g>
+                    </g>
+                    <!-- Direction hint arrow -->
+                    <path d="M 250 108 L 288 108 M 283 103 L 288 108 L 283 113" stroke="rgba(255,204,102,0.45)" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+                    <!-- HUD -->
+                    <text x="16" y="24" fill="#ffcc66" font-size="11" font-family="ui-monospace, monospace" font-weight="700" letter-spacing="1">SCORE 1,240</text>
+                    <text x="352" y="24" fill="#ffcc66" font-size="11" font-family="ui-monospace, monospace" font-weight="700" letter-spacing="1">0:47</text>
+                    <text x="16" y="188" fill="#a4b1c2" font-size="10" font-family="ui-monospace, monospace" letter-spacing="1.5">COPPER x18  COMBO x3</text>
+                  </svg>
+                </div>
+              </div>
+              <p>Copper Rush is a fast-paced arcade mining game built around short, repeatable runs. Explore the mine, collect valuable resources, build combos and survive until the timer ends.</p>
+              <p>Each run uses a different map progression and a daily gameplay modifier, so adapting your route and decisions is part of the challenge.</p>
+            </div>
+          </article>
+
+          <!-- Objective -->
+          <article class="guide-panel" data-id="s-obj">
+            <header class="guide-panel-head">
+              <span class="guide-panel-icon">&#127919;</span>
+              <h2 class="guide-panel-title">Objective</h2>
+            </header>
+            <div class="guide-panel-body">
+              <div class="hero">
+                <div class="hero-flow">
+                  <div class="hero-step"><span class="hero-step-icon">&#129689;</span><span class="hero-step-label">Collect Resources</span></div>
+                  <div class="hero-arrow">&#8595;</div>
+                  <div class="hero-step"><span class="hero-step-icon">&#128293;</span><span class="hero-step-label">Build Combo</span></div>
+                  <div class="hero-arrow">&#8595;</div>
+                  <div class="hero-step"><span class="hero-step-icon">&#9762;&#65039;</span><span class="hero-step-label">Escape the Gas</span></div>
+                  <div class="hero-arrow">&#8595;</div>
+                  <div class="hero-step"><span class="hero-step-icon">&#127942;</span><span class="hero-step-label">Get High Score</span></div>
+                </div>
+              </div>
+              <p>Collect as much copper and as many diamonds as possible before the run ends.</p>
+              <p>Your goal is not only to collect quickly, but also to maintain combos, use power-ups efficiently and stay ahead of the toxic gas.</p>
+            </div>
+          </article>
+
+          <!-- Controls -->
+          <article class="guide-panel" data-id="s-ctrl">
+            <header class="guide-panel-head">
+              <span class="guide-panel-icon">&#127920;</span>
+              <h2 class="guide-panel-title">Controls</h2>
+            </header>
+            <div class="guide-panel-body">
+              <div class="hero">
+                <div class="hero-pair">
+                  <div class="hero-tile">
+                    <div class="hero-tile-visual">&#128421;&#65039;</div>
+                    <h3 class="hero-tile-title">Desktop</h3>
+                    <div class="keycap-row"><span class="keycap">W</span></div>
+                    <div class="keycap-row">
+                      <span class="keycap">A</span>
+                      <span class="keycap">S</span>
+                      <span class="keycap">D</span>
+                    </div>
+                    <div class="keycap-row"><span class="keycap">1</span><span class="keycap-desc">Magnet</span></div>
+                    <div class="keycap-row"><span class="keycap">2</span><span class="keycap-desc">Speed Boost</span></div>
+                  </div>
+                  <div class="hero-tile">
+                    <div class="hero-tile-visual">&#128241;</div>
+                    <h3 class="hero-tile-title">Mobile</h3>
+                    <div class="mobile-controls-viz">
+                      <div class="joystick-viz"></div>
+                      <div class="pu-buttons">
+                        <span class="pu-button">&#129522;</span>
+                        <span class="pu-button">&#9889;</span>
+                      </div>
+                    </div>
+                    <p class="hero-tile-desc">Joystick + on-screen power-up buttons</p>
+                  </div>
+                </div>
+              </div>
+              <div class="guide-sub">Desktop</div>
+              <ul>
+                <li>Move with <strong>WASD</strong> or <strong>Arrow Keys</strong>.</li>
+                <li>Press <strong>1</strong> to activate Magnet.</li>
+                <li>Press <strong>2</strong> to activate Speed Boost.</li>
+              </ul>
+              <div class="guide-sub">Mobile</div>
+              <ul>
+                <li>Move using the on-screen joystick.</li>
+                <li>Activate power-ups using the buttons on the right side of the screen.</li>
+              </ul>
+            </div>
+          </article>
+
+          <!-- Copper -->
+          <article class="guide-panel" data-id="s-copper">
+            <header class="guide-panel-head">
+              <span class="guide-panel-icon">&#129689;</span>
+              <h2 class="guide-panel-title">Copper</h2>
+            </header>
+            <div class="guide-panel-body">
+              <div class="hero">
+                <div class="hero-focus">
+                  <div class="hero-focus-icon">&#129689;</div>
+                  <div class="hero-focus-tag">
+                    <p class="hero-focus-eyebrow">Main Resource</p>
+                    <p class="hero-focus-title">Main scoring resource of every run.</p>
+                  </div>
+                </div>
+              </div>
+              <p>Copper is the main resource found throughout the mine.</p>
+              <p>Collecting copper increases your run score. Fast consecutive pickups also build your combo multiplier, making each additional pickup more valuable.</p>
+            </div>
+          </article>
+
+          <!-- Diamonds -->
+          <article class="guide-panel" data-id="s-diam">
+            <header class="guide-panel-head">
+              <span class="guide-panel-icon">&#128142;</span>
+              <h2 class="guide-panel-title">Diamonds</h2>
+            </header>
+            <div class="guide-panel-body">
+              <div class="hero">
+                <div class="hero-diamonds">
+                  <div class="hero-diamond" style="--dia-color:#a8d4ff;">
+                    <div class="hero-diamond-icon">&#9670;&#xFE0E;</div>
+                    <p class="hero-diamond-name">Blue</p>
+                    <p class="hero-diamond-eff">+50 / +75 / +100</p>
+                  </div>
+                  <div class="hero-diamond" style="--dia-color:#6bff6b;">
+                    <div class="hero-diamond-icon">&#9670;&#xFE0E;</div>
+                    <p class="hero-diamond-name">Green</p>
+                    <p class="hero-diamond-eff">1.25x / 1.5x</p>
+                  </div>
+                  <div class="hero-diamond" style="--dia-color:#ffd700;">
+                    <div class="hero-diamond-icon">&#9670;&#xFE0E;</div>
+                    <p class="hero-diamond-name">Gold</p>
+                    <p class="hero-diamond-eff">2x multiplier</p>
+                  </div>
+                  <div class="hero-diamond" style="--dia-color:#dadcff;">
+                    <div class="hero-diamond-icon">&#9670;&#xFE0E;</div>
+                    <p class="hero-diamond-name">Black</p>
+                    <p class="hero-diamond-eff">JACKPOT</p>
+                  </div>
+                </div>
+              </div>
+              <p>Diamonds are rare pickups that provide much more value than standard copper. Each diamond has a color that decides how it changes your score.</p>
+              <ul>
+                <li><strong>Blue</strong> &mdash; adds a flat bonus to your score. Comes in +50, +75 and +100 variants. Most common, no per-run limit.</li>
+                <li><strong>Green</strong> &mdash; multiplies your total run score. Comes in 1.25x and 1.5x variants. Rare, capped per run.</li>
+                <li><strong>Gold</strong> &mdash; 2x multiplier. Rare, capped per run. Stacks with Green.</li>
+                <li><strong>Black</strong> &mdash; triggers a full JACKPOT event. Extremely rare, capped per run.</li>
+              </ul>
+              <p>Green and Gold multipliers stack, so collecting both in the same run can dramatically boost your final score.</p>
+            </div>
+          </article>
+
+          <!-- Gas -->
+          <article class="guide-panel" data-id="s-gas">
+            <header class="guide-panel-head">
+              <span class="guide-panel-icon">&#9762;&#65039;</span>
+              <h2 class="guide-panel-title">Gas</h2>
+            </header>
+            <div class="guide-panel-body">
+              <div class="hero">
+                <div class="hero-scene">
+                  <svg viewBox="0 0 400 200" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid slice">
+                    <defs>
+                      <pattern id="stoneG" width="24" height="24" patternUnits="userSpaceOnUse">
+                        <rect width="24" height="24" fill="#1a1410"/>
+                        <circle cx="6" cy="7" r="1" fill="rgba(180,120,60,0.10)"/>
+                        <circle cx="18" cy="15" r="0.8" fill="rgba(180,120,60,0.07)"/>
+                        <circle cx="12" cy="20" r="0.6" fill="rgba(180,120,60,0.06)"/>
+                      </pattern>
+                      <radialGradient id="lampConeG" cx="70%" cy="50%">
+                        <stop offset="0%" stop-color="rgba(255,230,150,0.24)"/>
+                        <stop offset="100%" stop-color="rgba(255,230,150,0)"/>
+                      </radialGradient>
+                      <radialGradient id="gasAura" cx="50%" cy="50%">
+                        <stop offset="0%" stop-color="rgba(80,255,100,0.42)"/>
+                        <stop offset="55%" stop-color="rgba(50,200,80,0.20)"/>
+                        <stop offset="100%" stop-color="rgba(30,150,50,0)"/>
+                      </radialGradient>
+                    </defs>
+                    <rect width="400" height="200" fill="url(#stoneG)"/>
+                    <!-- Miner headlamp cone reaching right (away from gas) -->
+                    <ellipse cx="290" cy="105" rx="100" ry="55" fill="url(#lampConeG)"/>
+                    <!-- Gas cloud chasing from the left -->
+                    <ellipse cx="30" cy="100" rx="70" ry="60" fill="rgba(50,200,80,0.14)"/>
+                    <ellipse cx="90" cy="105" rx="60" ry="52" fill="rgba(60,220,80,0.18)"/>
+                    <circle cx="150" cy="102" r="52" fill="url(#gasAura)"/>
+                    <!-- Main blob cluster (matches ctx.arc calls in drawGhost) -->
+                    <circle cx="145" cy="103" r="24" fill="rgba(60,220,80,0.55)"/>
+                    <circle cx="165" cy="97" r="20" fill="rgba(80,255,100,0.45)"/>
+                    <circle cx="132" cy="115" r="18" fill="rgba(40,180,60,0.5)"/>
+                    <circle cx="158" cy="118" r="15" fill="rgba(80,255,100,0.4)"/>
+                    <circle cx="175" cy="107" r="13" fill="rgba(60,220,80,0.45)"/>
+                    <circle cx="118" cy="98" r="12" fill="rgba(40,180,60,0.4)"/>
+                    <!-- Drifting particles reaching forward -->
+                    <circle cx="200" cy="88" r="4" fill="rgba(107,255,182,0.4)"/>
+                    <circle cx="218" cy="118" r="3" fill="rgba(107,255,182,0.35)"/>
+                    <circle cx="235" cy="98" r="2.5" fill="rgba(107,255,182,0.28)"/>
+                    <circle cx="252" cy="115" r="2" fill="rgba(107,255,182,0.22)"/>
+                    <!-- Motion lines from miner (fleeing) -->
+                    <path d="M 285 100 L 268 100" stroke="rgba(255,204,102,0.3)" stroke-width="1.5" stroke-linecap="round"/>
+                    <path d="M 288 108 L 273 108" stroke="rgba(255,204,102,0.25)" stroke-width="1.2" stroke-linecap="round"/>
+                    <path d="M 285 92 L 272 92" stroke="rgba(255,204,102,0.2)" stroke-width="1" stroke-linecap="round"/>
+                    <!-- Miner running right (fleeing the gas) -->
+                    <g transform="translate(305, 108)">
+                      <circle cx="0" cy="3" r="10" fill="#6b4c2a"/>
+                      <circle cx="0" cy="-6" r="7" fill="#e8c99b"/>
+                      <path d="M -8 -9 A 8 8 0 0 1 8 -9 Z" fill="#e8b830"/>
+                      <rect x="-10" y="-10" width="20" height="3.5" fill="#e8b830"/>
+                      <circle cx="0" cy="-13" r="2.6" fill="rgba(255,240,180,1)"/>
+                      <circle cx="0" cy="-13" r="1.3" fill="#fff"/>
+                      <!-- Pickaxe held back over shoulder while running -->
+                      <g transform="translate(-9, 0) rotate(50)">
+                        <rect x="-1" y="-14" width="2" height="20" fill="#6b4c2a"/>
+                        <path d="M -6 -16 L 6 -16 L 6 -13 L 4 -12 L -4 -12 L -6 -13 Z" fill="#8a8a8a"/>
+                      </g>
+                    </g>
+                    <!-- Danger warning HUD -->
+                    <text x="16" y="24" fill="#ff5544" font-size="11" font-family="ui-monospace, monospace" font-weight="700" letter-spacing="1.5">! GAS APPROACHING</text>
+                    <text x="352" y="24" fill="#ffcc66" font-size="11" font-family="ui-monospace, monospace" font-weight="700" letter-spacing="1">0:12</text>
+                  </svg>
+                </div>
+              </div>
+              <p>Toxic gas is the main threat in Copper Rush. It spreads through the mine and gradually reduces the safe playable area.</p>
+              <p>The gas becomes more dangerous as the run continues. If it reaches the player, the run ends immediately.</p>
+            </div>
+          </article>
+
+          <!-- Power-ups -->
+          <article class="guide-panel" data-id="s-power">
+            <header class="guide-panel-head">
+              <span class="guide-panel-icon">&#9889;</span>
+              <h2 class="guide-panel-title">Power-ups</h2>
+            </header>
+            <div class="guide-panel-body">
+              <div class="hero">
+                <div class="hero-pair">
+                  <div class="hero-tile">
+                    <div class="hero-tile-visual">&#129522;</div>
+                    <h3 class="hero-tile-title">Magnet</h3>
+                    <p class="hero-tile-desc">Pulls nearby copper toward the player for a limited time.</p>
+                  </div>
+                  <div class="hero-tile">
+                    <div class="hero-tile-visual">&#9889;</div>
+                    <h3 class="hero-tile-title">Speed Boost</h3>
+                    <p class="hero-tile-desc">Temporarily increases movement speed.</p>
+                  </div>
+                </div>
+              </div>
+              <p>Two power-ups are available during a run:</p>
+              <ul>
+                <li><strong>Magnet</strong> &mdash; pulls nearby copper toward the player for a limited time.</li>
+                <li><strong>Speed Boost</strong> &mdash; temporarily increases movement speed.</li>
+              </ul>
+              <p>Each power-up becomes available during the run and can only be used once, so timing matters.</p>
+            </div>
+          </article>
+
+          <!-- Combo & Frenzy -->
+          <article class="guide-panel" data-id="s-combo">
+            <header class="guide-panel-head">
+              <span class="guide-panel-icon">&#128293;</span>
+              <h2 class="guide-panel-title">Combo &amp; Frenzy</h2>
+            </header>
+            <div class="guide-panel-body">
+              <div class="hero">
+                <div class="hero-combo">
+                  <div class="combo-meter-wrap">
+                    <div class="combo-meter-label">
+                      <span>Combo</span>
+                      <span>x3</span>
+                    </div>
+                    <div class="combo-meter">
+                      <div class="combo-meter-fill"></div>
+                    </div>
+                  </div>
+                  <div class="frenzy-badge">FRENZY</div>
+                </div>
+              </div>
+              <p>Collect copper quickly without long pauses to build a combo multiplier. Higher combos increase the value of collected copper.</p>
+              <p>During the final seconds, <strong>Frenzy</strong> begins: copper value increases, but the gas becomes more aggressive.</p>
+            </div>
+          </article>
+
+          <!-- Score -->
+          <article class="guide-panel" data-id="s-score">
+            <header class="guide-panel-head">
+              <span class="guide-panel-icon">&#127942;</span>
+              <h2 class="guide-panel-title">Score</h2>
+            </header>
+            <div class="guide-panel-body">
+              <div class="hero">
+                <div class="hero-formula">
+                  <span class="formula-part"><span class="formula-part-icon">&#129689;</span>Copper</span>
+                  <span class="formula-op">+</span>
+                  <span class="formula-part"><span class="formula-part-icon">&#128142;</span>Diamonds</span>
+                  <span class="formula-op">+</span>
+                  <span class="formula-part"><span class="formula-part-icon">&#128293;</span>Combo</span>
+                  <span class="formula-op">+</span>
+                  <span class="formula-part"><span class="formula-part-icon">&#10022;</span>Multipliers</span>
+                  <span class="formula-op">=</span>
+                  <span class="formula-result">&#127942; Final Score</span>
+                </div>
+              </div>
+              <p>The final run score is based on the resources collected and the active bonuses earned during the run.</p>
+              <p>Copper, diamonds, combo multipliers and Frenzy performance all contribute to the final result.</p>
+            </div>
+          </article>
+
+          <!-- Daily Mutator -->
+          <article class="guide-panel" data-id="s-mut">
+            <header class="guide-panel-head">
+              <span class="guide-panel-icon">&#127922;</span>
+              <h2 class="guide-panel-title">Daily Mutator</h2>
+            </header>
+            <div class="guide-panel-body">
+              <div class="hero">
+                <div class="hero-mutators">
+                  <div class="hero-mut-card" style="--mut-c:#ffb347;">
+                    <span class="hero-mut-icon">&#9935;</span>
+                    <p class="hero-mut-name">Dense Copper</p>
+                    <p class="hero-mut-desc">Bigger, brighter copper. Worth 3 each.</p>
+                    <p class="hero-mut-eff">About 40% more copper spawns, and roughly 15% of it becomes rich copper worth 3&times; a normal pickup.</p>
+                  </div>
+                  <div class="hero-mut-card" style="--mut-c:#a8d4ff;">
+                    <span class="hero-mut-icon">&#128142;</span>
+                    <p class="hero-mut-name">Diamond Day</p>
+                    <p class="hero-mut-desc">Diamonds spawn faster. Rare caps unchanged.</p>
+                    <p class="hero-mut-eff">Seven diamond spawns during the run instead of the usual five; the limit on active diamonds is unchanged.</p>
+                  </div>
+                  <div class="hero-mut-card" style="--mut-c:#6bffb6;">
+                    <span class="hero-mut-icon">&#128168;</span>
+                    <p class="hero-mut-name">Fast Gas</p>
+                    <p class="hero-mut-desc">Gas accelerates faster. Frenzy unchanged.</p>
+                    <p class="hero-mut-eff">The gas ramps up sooner, shrinking the safe area faster than normal. Frenzy timing is not affected.</p>
+                  </div>
+                  <div class="hero-mut-card" style="--mut-c:#ff5544;">
+                    <span class="hero-mut-icon">&#128293;</span>
+                    <p class="hero-mut-name">High Risk</p>
+                    <p class="hero-mut-desc">Risk zones pay big. Gas hunts harder there.</p>
+                    <p class="hero-mut-eff">Copper inside risk zones is worth 4&times; instead of the usual 3&times;, but the gas closes on those areas more aggressively.</p>
+                  </div>
+                </div>
+              </div>
+              <p>Each UTC day, all players receive the same Daily Mutator. It changes one important rule of the mine and requires players to adapt their strategy.</p>
+            </div>
+          </article>
+
+          <!-- Leaderboards -->
+          <article class="guide-panel" data-id="s-lb">
+            <header class="guide-panel-head">
+              <span class="guide-panel-icon">&#128202;</span>
+              <h2 class="guide-panel-title">Leaderboards</h2>
+            </header>
+            <div class="guide-panel-body">
+              <div class="hero">
+                <div class="hero-lb">
+                  <div class="lb-mock-tabs">
+                    <span class="lb-mock-tab active">Today</span>
+                    <span class="lb-mock-tab">Week</span>
+                    <span class="lb-mock-tab">All-Time Copper</span>
+                    <span class="lb-mock-tab">Best Scores</span>
+                  </div>
+                  <div class="lb-mock-row">
+                    <span class="lb-mock-rank">1</span>
+                    <span class="lb-mock-name">MinerPro</span>
+                    <span class="lb-mock-score">12,480</span>
+                  </div>
+                  <div class="lb-mock-row">
+                    <span class="lb-mock-rank">2</span>
+                    <span class="lb-mock-name">CopperKing</span>
+                    <span class="lb-mock-score">10,220</span>
+                  </div>
+                  <div class="lb-mock-row you">
+                    <span class="lb-mock-rank">3</span>
+                    <span class="lb-mock-name">You</span>
+                    <span class="lb-mock-score">9,830</span>
+                  </div>
+                  <div class="lb-mock-row">
+                    <span class="lb-mock-rank">4</span>
+                    <span class="lb-mock-name">DiggerX</span>
+                    <span class="lb-mock-score">8,140</span>
+                  </div>
+                </div>
+              </div>
+              <p>Free Mode includes four leaderboard views:</p>
+              <ul>
+                <li><strong>Today</strong> &mdash; current daily competition.</li>
+                <li><strong>This Week</strong> &mdash; total weekly performance, grouped by day.</li>
+                <li><strong>All-Time Copper</strong> &mdash; lifetime copper collected.</li>
+                <li><strong>Best Scores</strong> &mdash; highest individual run scores.</li>
+              </ul>
+              <p>Today combines each player&rsquo;s best runs of the day with a consistency bonus that rewards playing multiple full runs.</p>
+            </div>
+          </article>
+
+          <!-- Free Mode Rewards -->
+          <article class="guide-panel" data-id="s-rew">
+            <header class="guide-panel-head">
+              <span class="guide-panel-icon">&#127873;</span>
+              <h2 class="guide-panel-title">Free Mode Rewards</h2>
+            </header>
+            <div class="guide-panel-body">
+              <div class="hero">
+                <div class="hero-rewards">
+                  <div class="reward-badge">
+                    <span class="reward-badge-icon">&#127918;</span>
+                    <p class="reward-badge-title">Practice Mode</p>
+                  </div>
+                  <div class="reward-badge">
+                    <span class="reward-badge-icon">&#127942;</span>
+                    <p class="reward-badge-title">Leaderboard Competition</p>
+                  </div>
+                  <div class="reward-badge">
+                    <span class="reward-badge-icon">&#127775;</span>
+                    <p class="reward-badge-title">No Entry Fee</p>
+                  </div>
+                </div>
+              </div>
+              <p>Free Mode is designed for practice, competition and leaderboard progression.</p>
+              <p>It does not include entry fees or monetary rewards. Paid competition will be introduced separately in v1.</p>
+            </div>
+          </article>
+
+        </div>
+      </div>
+    </section>
+
+    <!-- Paid Mode -->
+    <section class="panel" data-panel="paid" role="tabpanel">
+      <div class="paid">
+
+        <div class="paid-hero">
+          <span class="paid-badge">Coming in V1</span>
+          <h1 class="paid-title">Paid Mode</h1>
+          <p class="paid-sub">Compete with real entry fees. Climb the leaderboard. Play for rewards.</p>
+          <p class="paid-tag">Every entry helps power the <em>Copper Rush</em> reward ecosystem.</p>
+        </div>
+
+        <div class="paid-flow">
+
+          <svg class="pf-returns" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+            <path class="pf-line pf-line-left"
+                  d="M 12 75.5 Q 4 75.5 4 68 L 4 15 Q 4 7 12 7 L 44 7"
+                  vector-effect="non-scaling-stroke"/>
+            <path class="pf-line pf-line-right"
+                  d="M 88 75.5 Q 96 75.5 96 68 L 96 15 Q 96 7 88 7 L 56 7"
+                  vector-effect="non-scaling-stroke"/>
+          </svg>
+          <span class="pf-return-arrow pf-return-arrow-left" aria-hidden="true"></span>
+          <span class="pf-return-arrow pf-return-arrow-right" aria-hidden="true"></span>
+
+          <div class="pf-node pf-play">Player</div>
+          <div class="pf-arrow dim" aria-hidden="true"></div>
+
+          <div class="pf-node pf-entry">
+            <div class="pf-entry-icon" aria-hidden="true">
+              <svg width="44" height="44" viewBox="0 0 44 44" fill="none">
+                <circle cx="22" cy="22" r="19" fill="none" stroke="#ffcc66" stroke-width="2"/>
+                <circle cx="22" cy="22" r="15" fill="none" stroke="#ffcc66" stroke-width="1" opacity="0.5"/>
+                <text x="22" y="29" text-anchor="middle" font-family="ui-monospace, Menlo, Consolas, monospace" font-size="18" font-weight="800" fill="#ffcc66">C</text>
+              </svg>
+            </div>
+            <div class="pf-entry-title">Entry Fee</div>
+            <div class="pf-entry-sub">Paid to enter</div>
+          </div>
+
+          <div class="pf-arrow" aria-hidden="true"></div>
+
+          <div class="pf-split" aria-hidden="true">Split</div>
+
+          <div class="pf-branches" aria-hidden="true">
+            <div class="pf-branch-drops">
+              <span></span><span></span><span></span><span></span>
+            </div>
+          </div>
+
+          <div class="pf-destinations">
+            <div class="pf-dest leader">
+              <span class="pf-dest-icon" aria-hidden="true">&#127942;</span>
+              <div class="pf-dest-title">Leaderboard Rewards</div>
+              <p class="pf-dest-desc">Compete for leaderboard payouts.</p>
+              <span class="pf-return-note">&#8626; Returns to Player</span>
+            </div>
+            <div class="pf-dest burn">
+              <span class="pf-dest-icon" aria-hidden="true">&#128293;</span>
+              <div class="pf-dest-title">Burn</div>
+              <p class="pf-dest-desc">Removes part of the fees from circulation.</p>
+            </div>
+            <div class="pf-dest dev">
+              <span class="pf-dest-icon" aria-hidden="true">&#128736;&#65039;</span>
+              <div class="pf-dest-title">Development</div>
+              <p class="pf-dest-desc">Supports continued development.</p>
+            </div>
+            <div class="pf-dest treasury">
+              <span class="pf-dest-icon" aria-hidden="true">&#127974;</span>
+              <div class="pf-dest-title">Treasury</div>
+              <p class="pf-dest-desc">Builds the reward ecosystem.</p>
+              <span class="pf-return-note">&#8626; Returns to Player</span>
+            </div>
+          </div>
+
+        </div>
+
+        <p class="paid-disclaimer">Paid Mode mechanics are in development and may evolve before launch.</p>
+
+      </div>
+    </section>
+
+    <!-- Roadmap -->
+    <section class="panel" data-panel="roadmap" role="tabpanel">
+      <div class="roadmap">
+        <div class="roadmap-legend" aria-label="Roadmap status legend">
+          <div class="rm-legend-row live"><span class="rm-legend-dot"></span> Live</div>
+          <div class="rm-legend-row next"><span class="rm-legend-dot"></span> Coming Next</div>
+          <div class="rm-legend-row planned"><span class="rm-legend-dot"></span> Planned</div>
+        </div>
+        <div class="roadmap-marker roadmap-marker-top">Surface</div>
+        <div class="roadmap-levels">
+
+          <div class="rm-level status-live" data-idx="0">
+            <div class="rm-nodecol"><div class="rm-node" aria-hidden="true"><div class="rm-node-inner">V0</div></div></div>
+            <div class="rm-card">
+              <div class="rm-header">
+                <h3 class="rm-title">Free Mode</h3>
+                <span class="rm-status">Live</span>
+              </div>
+              <ul class="rm-list">
+                <li>Free gameplay</li>
+                <li>Daily and weekly leaderboards</li>
+                <li>Daily Mutators</li>
+              </ul>
+            </div>
+          </div>
+
+          <div class="rm-level status-next" data-idx="1">
+            <div class="rm-nodecol"><div class="rm-node" aria-hidden="true"><div class="rm-node-inner">V1</div></div></div>
+            <div class="rm-card">
+              <div class="rm-header">
+                <h3 class="rm-title">Paid Mode</h3>
+                <span class="rm-status">Coming Next</span>
+              </div>
+              <ul class="rm-list">
+                <li>Entry fee</li>
+                <li>Leaderboard rewards</li>
+                <li>Treasury, burn and development split</li>
+              </ul>
+            </div>
+          </div>
+
+          <div class="rm-level status-planned" data-idx="2">
+            <div class="rm-nodecol"><div class="rm-node" aria-hidden="true"><div class="rm-node-inner">V2</div></div></div>
+            <div class="rm-card">
+              <div class="rm-header">
+                <h3 class="rm-title">Treasury Rewards</h3>
+                <span class="rm-status">Planned</span>
+                <span class="rm-lock" aria-hidden="true">&#128274;</span>
+              </div>
+              <ul class="rm-list">
+                <li>Earn from your All-Time Copper</li>
+                <li>Treasury-powered passive rewards</li>
+                <li>Challenges &amp; new reward opportunities</li>
+              </ul>
+            </div>
+          </div>
+
+          <div class="rm-level status-planned" data-idx="3">
+            <div class="rm-nodecol"><div class="rm-node" aria-hidden="true"><div class="rm-node-inner">V3</div></div></div>
+            <div class="rm-card">
+              <div class="rm-header">
+                <h3 class="rm-title">Referral System</h3>
+                <span class="rm-status">Planned</span>
+                <span class="rm-lock" aria-hidden="true">&#128274;</span>
+              </div>
+              <ul class="rm-list">
+                <li>Invite players</li>
+                <li>Referral rewards</li>
+                <li>Community growth</li>
+              </ul>
+            </div>
+          </div>
+
+          <div class="rm-level status-planned" data-idx="4">
+            <div class="rm-nodecol"><div class="rm-node" aria-hidden="true"><div class="rm-node-inner">V4</div></div></div>
+            <div class="rm-card">
+              <div class="rm-header">
+                <h3 class="rm-title">High Stakes</h3>
+                <span class="rm-status">Planned</span>
+                <span class="rm-lock" aria-hidden="true">&#128274;</span>
+              </div>
+              <ul class="rm-list">
+                <li>Choose your entry level</li>
+                <li>Compete in higher-stakes leaderboards</li>
+                <li>Earn more Copper. Build a bigger treasury share.</li>
+              </ul>
+            </div>
+          </div>
+
+          <div class="rm-level status-planned" data-idx="5">
+            <div class="rm-nodecol"><div class="rm-node" aria-hidden="true"><div class="rm-node-inner">V5</div></div></div>
+            <div class="rm-card">
+              <div class="rm-header">
+                <h3 class="rm-title">Greed Mode</h3>
+                <span class="rm-status">Planned</span>
+                <span class="rm-lock" aria-hidden="true">&#128274;</span>
+              </div>
+            </div>
+          </div>
+
+        </div>
+        <div class="roadmap-marker roadmap-marker-bottom">Deep Mine</div>
+        <p class="roadmap-footnote">Roadmap features and mechanics may evolve during development.</p>
+      </div>
+    </section>
+
+  </main>
+
+  <script>
+    (function () {
+      var tabs   = document.querySelectorAll(".tab");
+      var panels = document.querySelectorAll(".panel");
+      tabs.forEach(function (btn) {
+        btn.addEventListener("click", function () {
+          var target = btn.getAttribute("data-tab");
+          tabs.forEach(function (t) {
+            var isActive = t === btn;
+            t.classList.toggle("active", isActive);
+            t.setAttribute("aria-selected", isActive ? "true" : "false");
+          });
+          panels.forEach(function (p) {
+            p.classList.toggle("active", p.getAttribute("data-panel") === target);
+          });
+        });
+      });
+
+      var sideItems   = document.querySelectorAll(".side-item");
+      var guidePanels = document.querySelectorAll(".guide-panel");
+      sideItems.forEach(function (si) {
+        si.addEventListener("click", function () {
+          var id = si.getAttribute("data-target");
+          sideItems.forEach(function (s) {
+            s.classList.toggle("active", s === si);
+          });
+          guidePanels.forEach(function (p) {
+            p.classList.toggle("active", p.getAttribute("data-id") === id);
+          });
+          if (window.matchMedia("(max-width: 900px)").matches) {
+            var target = document.querySelector('.guide-panel[data-id="' + id + '"]');
+            if (target && target.scrollIntoView) {
+              target.scrollIntoView({ behavior: "smooth", block: "start" });
+            }
+          }
+        });
+      });
+    })();
+  </script>
+</body>
+</html>
