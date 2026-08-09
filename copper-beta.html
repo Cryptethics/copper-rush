@@ -898,6 +898,31 @@ button:disabled { opacity: .5; cursor: not-allowed; }
       opacity: 0.8;
       animation: fadeSlideIn 1.2s ease-out 0.3s both;
     }
+
+    /* How to Play toggle — hidden on desktop, revealed on mobile below */
+    .htp-toggle {
+      display: none;
+      background: transparent;
+      border: none;
+      color: #ffcc66;
+      font-size: 12px;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      font-weight: 600;
+      cursor: pointer;
+      padding: 8px 14px;
+      font-family: inherit;
+      opacity: 0.85;
+      margin: 4px auto 0;
+    }
+    .htp-toggle::after {
+      content: " \25BE"; /* ▾ */
+      margin-left: 4px;
+      display: inline-block;
+      opacity: 0.7;
+    }
+    .htp-toggle.expanded::after { content: " \25B4"; /* ▴ */ }
+    .htp-toggle:hover { opacity: 1; }
     .landing-rules span {
       display: inline-block;
       padding: 1px 7px;
@@ -1161,6 +1186,116 @@ button:disabled { opacity: .5; cursor: not-allowed; }
       cursor: pointer;
     }
     #btnDisconnectWallet:hover { color: #ff6b6b; border-color: rgba(255,107,107,0.3); }
+
+    /* ── Player Stats topbar shortcut ── */
+    .topbar-right {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      pointer-events: auto;
+    }
+    #btnPlayerStats {
+      background: rgba(255,204,102,0.06);
+      border: 1px solid rgba(255,204,102,0.25);
+      color: #ffcc66;
+      font-size: 16px;
+      padding: 6px 10px;
+      border-radius: 10px;
+      cursor: pointer;
+      line-height: 1;
+      transition: background 0.2s, border-color 0.2s;
+    }
+    #btnPlayerStats:hover {
+      background: rgba(255,204,102,0.12);
+      border-color: rgba(255,204,102,0.45);
+    }
+
+    /* ── Player Stats popover (anchored under #btnPlayerStats) ── */
+    #ps-popover {
+      position: fixed;
+      top: 0;
+      right: 0;
+      max-width: min(300px, calc(100vw - 16px));
+      width: max-content;
+      min-width: 220px;
+      background: #131c26;
+      border: 1px solid rgba(255,204,102,0.35);
+      border-radius: 12px;
+      padding: 12px 14px 12px;
+      color: #e6eef8;
+      text-align: center;
+      box-shadow: 0 8px 20px rgba(0,0,0,0.55), 0 0 18px rgba(255,204,102,0.10);
+      box-sizing: border-box;
+      z-index: 200;
+      display: none;
+    }
+    #ps-popover.open { display: block; }
+    .ps-title {
+      margin: 0 0 2px;
+      font-size: 11px;
+      letter-spacing: 2.5px;
+      text-transform: uppercase;
+      color: #ffcc66;
+      font-weight: 700;
+      font-family: ui-monospace, Menlo, Consolas, monospace;
+    }
+    .ps-nick {
+      margin: 0 0 10px;
+      font-size: 12.5px;
+      color: #a4b1c2;
+      letter-spacing: 0.4px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .ps-hero {
+      padding: 10px 0 12px;
+      border-top: 1px solid rgba(255,255,255,0.06);
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+      margin-bottom: 10px;
+    }
+    .ps-hero-label {
+      font-size: 9.5px;
+      letter-spacing: 1.8px;
+      text-transform: uppercase;
+      color: #a4b1c2;
+      font-weight: 600;
+      margin-bottom: 6px;
+    }
+    .ps-hero-value {
+      font-size: 24px;
+      font-weight: 800;
+      color: #ffb347;
+      font-family: ui-monospace, Menlo, Consolas, monospace;
+      letter-spacing: 0.8px;
+      line-height: 1;
+    }
+    .ps-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+    .ps-cell {
+      padding: 8px 6px;
+      background: rgba(255,255,255,0.03);
+      border: 1px solid rgba(255,255,255,0.06);
+      border-radius: 8px;
+    }
+    .ps-cell-label {
+      font-size: 9px;
+      letter-spacing: 1.2px;
+      text-transform: uppercase;
+      color: #a4b1c2;
+      font-weight: 600;
+      margin-bottom: 4px;
+    }
+    .ps-cell-value {
+      font-size: 16px;
+      font-weight: 800;
+      color: #e6eef8;
+      font-family: ui-monospace, Menlo, Consolas, monospace;
+    }
+
     #walletInstallHint {
       font-size: 12px;
       opacity: 0.5;
@@ -1760,6 +1895,119 @@ button:disabled { opacity: .5; cursor: not-allowed; }
         padding: 6px 10px;
         letter-spacing: 1px;
       }
+
+      /* ── Landing content — compact mobile polish ── */
+      body.landing-on .landing-icon { font-size: 40px; margin-top: 20px; }
+      body.landing-on .landing-title { font-size: 34px; margin: 8px 0 4px; letter-spacing: 1.5px; }
+      body.landing-on .landing-subtitle { font-size: 12px; margin-bottom: 16px; letter-spacing: 3px; }
+
+      /* Prize Pool — collapsed to a single-line pill */
+      body.landing-on #landing-prize-pool {
+        display: inline-flex;
+        align-items: baseline;
+        justify-content: center;
+        gap: 8px;
+        padding: 8px 16px;
+        margin: 4px auto 12px;
+      }
+      body.landing-on #landing-prize-pool .pp-label {
+        font-size: 0;
+        margin-bottom: 0;
+        opacity: 1;
+      }
+      body.landing-on #landing-prize-pool .pp-label::before {
+        content: "Prize Pool";
+        font-size: 10.5px;
+        letter-spacing: 1.5px;
+        text-transform: uppercase;
+        opacity: 0.55;
+        font-weight: 600;
+      }
+      body.landing-on #landing-prize-pool .pp-label::after {
+        content: " \00B7"; /* · */
+        font-size: 10.5px;
+        opacity: 0.4;
+        margin-left: 2px;
+      }
+      body.landing-on #landing-prize-pool .pp-amount {
+        font-size: 18px;
+        filter: drop-shadow(0 0 8px rgba(251,191,36,0.30));
+      }
+      body.landing-on #landing-prize-pool .pp-sub { display: none; }
+
+      /* Daily Mutator — collapsed to a single-line pill */
+      body.landing-on #dailyMutatorCard {
+        flex-direction: row;
+        align-items: baseline;
+        justify-content: center;
+        gap: 8px;
+        padding: 8px 14px;
+        margin: 6px auto 12px;
+        max-width: max-content;
+      }
+      body.landing-on #dailyMutatorCard .mut-label { font-size: 0; }
+      body.landing-on #dailyMutatorCard .mut-label::before {
+        content: "Daily Mutator";
+        font-size: 10px;
+        letter-spacing: 1.5px;
+        text-transform: uppercase;
+        color: rgba(255,255,255,0.45);
+        font-weight: 600;
+      }
+      body.landing-on #dailyMutatorCard .mut-label::after {
+        content: " \00B7";
+        font-size: 10px;
+        color: rgba(255,255,255,0.35);
+        margin-left: 2px;
+      }
+      body.landing-on #dailyMutatorCard { cursor: pointer; }
+      body.landing-on #dailyMutatorCard .mut-name { font-size: 13px; letter-spacing: 0.05em; }
+      body.landing-on #dailyMutatorCard .mut-name::after {
+        content: " \25BE"; /* ▾ */
+        margin-left: 4px;
+        opacity: 0.65;
+        font-weight: 500;
+        font-size: 0.85em;
+      }
+      body.landing-on #dailyMutatorCard .mut-desc { display: none; }
+      body.landing-on #dailyMutatorCard .mut-dev-tag { display: none; }
+
+      /* Expanded state — card grows vertically to reveal the mutator's own
+         description (populated live from activeMutator.desc).
+         align-items: center overrides the row-mode baseline so all rows
+         (label / name / desc) stay horizontally centered when stacked. */
+      body.landing-on #dailyMutatorCard.expanded {
+        flex-direction: column;
+        align-items: center;
+        gap: 4px;
+        padding: 10px 14px 12px;
+        margin: 6px auto 12px;
+        max-width: min(360px, calc(100vw - 32px));
+      }
+      body.landing-on #dailyMutatorCard.expanded .mut-label::after { content: ""; }
+      body.landing-on #dailyMutatorCard.expanded .mut-name::after { content: " \25B4"; /* ▴ */ }
+      body.landing-on #dailyMutatorCard.expanded .mut-desc {
+        display: block;
+        font-size: 11px;
+        color: rgba(255,235,200,0.75);
+        line-height: 1.4;
+        text-align: center;
+        margin-top: 2px;
+      }
+
+      /* Nickname group — slightly tighter */
+      body.landing-on .landing-nickname { margin-top: 4px; margin-bottom: 8px; }
+
+      /* How to Play — collapsible, default collapsed */
+      body.landing-on .htp-toggle { display: inline-block; }
+      body.landing-on .landing-rules {
+        display: none;
+        margin: 8px auto 14px;
+        font-size: 12.5px;
+        line-height: 1.65;
+      }
+      body.landing-on .landing-rules.expanded { display: block; }
+
       #right-panel { display: contents; }
       #right-panel > *:not(#btnStartNew):not(#btnViewLB) { display: none !important; }
       /* Both idle CTAs sit side-by-side, centered around the viewport
@@ -1977,17 +2225,20 @@ button:disabled { opacity: .5; cursor: not-allowed; }
   <div id="landing">
     <canvas id="particles-canvas"></canvas>
 
-    <!-- Top bar: whitepaper (left) + wallet (right) -->
+    <!-- Top bar: docs (left) + player-stats + wallet (right) -->
     <div class="landing-topbar">
       <a class="topbar-link" id="btnDocs" href="docs.html" target="_blank" rel="noopener">Docs</a>
-      <div id="wallet-area">
-        <div id="walletInstallHint" style="display:none;">
-          Phantom not found. <a href="https://phantom.app" target="_blank">Install</a>
-        </div>
-        <button id="btnConnectWallet">&#9679; Connect Wallet</button>
-        <div id="walletStatus" style="display:none;">
-          <span id="walletAddress">-</span>
-          <button id="btnDisconnectWallet">Disconnect</button>
+      <div class="topbar-right">
+        <button id="btnPlayerStats" type="button" title="Player Stats" aria-label="Player Stats">&#128100;</button>
+        <div id="wallet-area">
+          <div id="walletInstallHint" style="display:none;">
+            Phantom not found. <a href="https://phantom.app" target="_blank">Install</a>
+          </div>
+          <button id="btnConnectWallet">&#9679; Connect Wallet</button>
+          <div id="walletStatus" style="display:none;">
+            <span id="walletAddress">-</span>
+            <button id="btnDisconnectWallet">Disconnect</button>
+          </div>
         </div>
       </div>
     </div>
@@ -2022,7 +2273,8 @@ button:disabled { opacity: .5; cursor: not-allowed; }
         <button id="btnPlayFree">&#9654; Play Free Demo</button>
       </div>
 
-      <div class="landing-rules">
+      <button type="button" class="htp-toggle" aria-expanded="false" aria-controls="landing-rules">How to Play</button>
+      <div class="landing-rules" id="landing-rules">
         &#9656; Collect <b style="color:#ffb347;">copper nuggets</b> and <b style="color:#8bb8ff;">diamonds</b> before time runs out<br>
         &#9656; Avoid the <b style="color:#6bffb6;">toxic gas</b> - it gets faster over time<br>
         &#9656; Use power-ups: <span>1</span> Magnet &bull; <span>2</span> Speed<br>
@@ -2535,6 +2787,26 @@ button:disabled { opacity: .5; cursor: not-allowed; }
         <button id="dpReset">Reset dev settings</button>
       </div>
       <div class="dp-note">?dev=1 only &middot; saved in localStorage</div>
+    </div>
+  </div>
+
+  <!-- Player Stats popover (anchored under #btnPlayerStats in landing-topbar) -->
+  <div id="ps-popover" role="dialog" aria-label="Player Stats" aria-labelledby="ps-title">
+    <h3 id="ps-title" class="ps-title">Player Stats</h3>
+    <p id="ps-nick" class="ps-nick">Anonymous</p>
+    <div class="ps-hero">
+      <div class="ps-hero-label">All-Time Copper</div>
+      <div class="ps-hero-value" id="ps-copper">0</div>
+    </div>
+    <div class="ps-row">
+      <div class="ps-cell">
+        <div class="ps-cell-label">Today's Score</div>
+        <div class="ps-cell-value" id="ps-score">0</div>
+      </div>
+      <div class="ps-cell">
+        <div class="ps-cell-label">Today's Rank</div>
+        <div class="ps-cell-value" id="ps-rank">&mdash;</div>
+      </div>
     </div>
   </div>
 
@@ -7985,6 +8257,160 @@ button:disabled { opacity: .5; cursor: not-allowed; }
   } else {
     window.addEventListener("load", initPhantom);
   }
+
+  // ----------------------------
+  // Player Stats popover (landing shortcut, anchored under #btnPlayerStats)
+  //   Data sources — all reused from Free right-panel / leaderboard, no new APIs:
+  //     All-Time Copper : FreePlayerAPI.get(deviceId).all_time_copper  (fallback: legacy)
+  //     Today's Score   : FreeLeaderboardAPI.getPlayerDailyStats(deviceId).dailyScore
+  //     Today's Rank    : FreeLeaderboardAPI.getDailyLeaderboard() → find device_id → idx+1
+  //   Refresh on every open (Promise.allSettled).
+  // ----------------------------
+  (function initPlayerStatsPopover() {
+    const btn = document.getElementById("btnPlayerStats");
+    const pop = document.getElementById("ps-popover");
+    if (!btn || !pop) return;
+    const nickEl   = document.getElementById("ps-nick");
+    const copperEl = document.getElementById("ps-copper");
+    const scoreEl  = document.getElementById("ps-score");
+    const rankEl   = document.getElementById("ps-rank");
+
+    let isOpen = false;
+    let openToken = 0; // guards against stale async results after close
+
+    function fmt(n) {
+      return String(Number(n) || 0).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+    }
+
+    // Anchor popover centered under the button; clamp to viewport edges.
+    // Called on open + resize + scroll while open.
+    function positionPopover() {
+      const rect = btn.getBoundingClientRect();
+      const margin = 8;
+      pop.style.top   = (rect.bottom + margin) + "px";
+      pop.style.right = "auto";
+      pop.style.left  = "0px"; // temporary — measure natural width first
+      const popW = pop.getBoundingClientRect().width;
+      const btnCenter = (rect.left + rect.right) / 2;
+      let leftPos = btnCenter - popW / 2;
+      const maxLeft = window.innerWidth - popW - margin;
+      if (leftPos < margin)      leftPos = margin;
+      else if (leftPos > maxLeft) leftPos = Math.max(margin, maxLeft);
+      pop.style.left = leftPos + "px";
+    }
+
+    function close() {
+      if (!isOpen) return;
+      isOpen = false;
+      openToken++;
+      pop.classList.remove("open");
+      btn.setAttribute("aria-expanded", "false");
+      document.removeEventListener("keydown", onEsc);
+      document.removeEventListener("click", onDocClick);
+      window.removeEventListener("resize", positionPopover);
+      window.removeEventListener("scroll", positionPopover, true);
+    }
+    function onEsc(e) { if (e.key === "Escape") close(); }
+    function onDocClick(e) {
+      if (pop.contains(e.target)) return; // clicks inside popover keep it open
+      close();
+    }
+
+    async function open() {
+      if (isOpen) return;
+      isOpen = true;
+      const myToken = ++openToken;
+
+      let deviceId = null;
+      try { deviceId = localStorage.getItem(FREE_DEVICE_ID_KEY); } catch {}
+      const nick = (getNickname() || "").trim();
+      nickEl.textContent = nick || "Anonymous";
+      copperEl.textContent = "…";
+      scoreEl.textContent  = "…";
+      rankEl.textContent   = "…";
+      pop.classList.add("open");
+      btn.setAttribute("aria-expanded", "true");
+      positionPopover();
+      document.addEventListener("keydown", onEsc);
+      document.addEventListener("click", onDocClick);
+      window.addEventListener("resize", positionPopover);
+      window.addEventListener("scroll", positionPopover, true);
+
+      const [rowRes, statsRes, lbRes] = await Promise.allSettled([
+        deviceId ? FreePlayerAPI.get(deviceId) : Promise.resolve(null),
+        deviceId ? FreeLeaderboardAPI.getPlayerDailyStats(deviceId) : Promise.resolve(computeDailyScore([])),
+        FreeLeaderboardAPI.getDailyLeaderboard(),
+      ]);
+      if (myToken !== openToken) return; // popover was closed / re-opened
+
+      // All-Time Copper — Supabase row, fallback to legacy localStorage
+      let allTime = 0;
+      if (rowRes.status === "fulfilled" && rowRes.value) {
+        allTime = Number(rowRes.value.all_time_copper) || 0;
+      } else {
+        allTime = Number(getLegacyFreeAllTimeCopper()) || 0;
+      }
+      copperEl.textContent = fmt(allTime);
+
+      // Today's Score — computed from Free scores today
+      const daily = (statsRes.status === "fulfilled") ? statsRes.value : computeDailyScore([]);
+      const dailyScore = Number(daily && daily.dailyScore) || 0;
+      scoreEl.textContent = fmt(dailyScore);
+
+      // Today's Rank — position in Free Today leaderboard by device_id
+      if (dailyScore === 0) {
+        rankEl.textContent = "—";
+      } else if (lbRes.status === "fulfilled" && Array.isArray(lbRes.value) && deviceId) {
+        const idx = lbRes.value.findIndex(p => p.device_id === deviceId);
+        rankEl.textContent = idx >= 0 ? "#" + (idx + 1) : "—";
+      } else {
+        rankEl.textContent = "—";
+      }
+      // Content width may have grown — re-anchor
+      positionPopover();
+    }
+
+    btn.setAttribute("aria-haspopup", "true");
+    btn.setAttribute("aria-expanded", "false");
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation(); // prevent onDocClick from firing on same click
+      if (isOpen) close(); else open();
+    });
+  })();
+
+  // ----------------------------
+  // How to Play — mobile collapsible toggle
+  //   Button is hidden on desktop via CSS, so the click wiring is a no-op there.
+  //   Rules stay visible on desktop (default state); on mobile they start
+  //   collapsed and toggle via .expanded class.
+  // ----------------------------
+  (function initHowToPlayToggle() {
+    const htpBtn = document.querySelector(".htp-toggle");
+    const htpRules = document.getElementById("landing-rules");
+    if (!htpBtn || !htpRules) return;
+    htpBtn.addEventListener("click", () => {
+      const expanded = htpRules.classList.toggle("expanded");
+      htpBtn.classList.toggle("expanded", expanded);
+      htpBtn.setAttribute("aria-expanded", expanded ? "true" : "false");
+    });
+  })();
+
+  // ----------------------------
+  // Daily Mutator — mobile expand/collapse
+  //   Card is compact by default; tap toggles .expanded, revealing the live
+  //   activeMutator.desc that #dmCardDesc already receives from the mutator
+  //   logic. Desktop CSS has no .expanded rules, so the class toggle is a
+  //   visual no-op there — presentation stays identical.
+  // ----------------------------
+  (function initDailyMutatorToggle() {
+    const dmCard = document.getElementById("dailyMutatorCard");
+    if (!dmCard) return;
+    dmCard.setAttribute("aria-expanded", "false");
+    dmCard.addEventListener("click", () => {
+      const expanded = dmCard.classList.toggle("expanded");
+      dmCard.setAttribute("aria-expanded", expanded ? "true" : "false");
+    });
+  })();
 
   // ----------------------------
   // Pay-to-play
