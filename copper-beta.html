@@ -3311,6 +3311,7 @@ button:disabled { opacity: .5; cursor: not-allowed; }
           prefer: "return=minimal",
           body: JSON.stringify({
             nickname: record.nickname || "Anonymous",
+            wallet: record.wallet || null,
             score: record.score,
             copper: record.copper,
             lb50: lb50_count,
