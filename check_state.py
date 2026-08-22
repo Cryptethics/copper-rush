@@ -17,26 +17,25 @@ def rpc(method, params):
         headers={"Content-Type":"application/json"})
     return json.loads(urllib.request.urlopen(req).read())
 
+# Current Copper Rush program on devnet (V2 = the one copper-beta.html wires
+# via COPPER_PROGRAM_ID). Source of truth: tools/copper_rpc_reader.js.
+# An older V1 deployment (owner=3e8EsKpaRaHevRLyPdWW73NELqHC1keBD6ZMVrbV2rUF)
+# still has orphan VaultState PDAs on-chain but no traffic — do NOT read those.
+PROGRAM_ID = "EdYmMfzFidw4epQkBBiEP3bzJLYRGbKe6uqUuqq1Ggsg"
 VAULT_STATES = {
-    "DAILY":   "w8YZd6VcPXRFz4DJQXJoxQY1kofz2dU9wuYkNiCYqvi",
-    "WEEKLY":  "6QnrzcuRX83QvVwWQxxHTAA5DcDZg1SuvvcuBTzigcQ4",
-    "MONTHLY": "Etf393tpZcukbP9ioYU9snAi9jEki5dauotCB6JsA26d",
-    "JACKPOT": "rKLwTJ1WwNzcyrbSikZoHS3bzp2qNm7khjKBA5aHBju",
+    "DAILY":   "4oRyLU9ajheaJM8dz61pSknYBiDRrULw8f964PxhzFE4",
+    "WEEKLY":  "DZyKiMBbwDHZGbwweHmvhe8JsaDkDtAUG4hEBDR5qvYo",
+    "MONTHLY": "EVi1twXcfeY1wJGDX8FBBKbR2AATdfdq2Fmm5cxNpdZh",
+    "JACKPOT": "7sM92MXjKwxmw1U8VQD7KaUiP5mRjeD8oSaJBtgSzCM7",
 }
-VAULTS = {
-    "DAILY":   "4fB3C8rALN3FYb4BCYAbhYfBxq1hE9o3tegV2mGxXd99",
-    "WEEKLY":  "FcXvbTzHq9PAAdPcp9A2iADLUr8yYwcN5p6xwDwan8hX",
-    "MONTHLY": "5jSZBpV4gcxZqN6iv5XRCcy9pJUnVVtsJgjHvCfx2MUn",
-    "JACKPOT": "2Lor277QA8uazot6L2UBQ8ADhrQQUrbMCYZYKSPwU4cn",
-}
-OPS = {
-    "treasury": "6CzmSfWPsy4wj3QBQ1jH8CJVULeHQRXbmK6fNPCX5V65",
-    "dev":      "HaAShEiX69acKB56FEFHMrC3zJfuc5d2AXFuJVR6i2YS",
-    "burn":     "Euarr1Pu3LMPWgZRcwUYEcjwfE6FzJ5W5wsN8Wm6AD39",
-}
+# Vault PDAs (system-owned SOL holders) and operator wallets for V2 are not
+# in the trusted source yet — inspect them via `node tools/paid_daily_dry_run.js`
+# or a proper Ed25519-aware PDA client. Intentionally omitted here so this
+# script never mixes V1 orphan data with V2 authoritative state.
 
 now = int(time.time())
-print(f"current Unix time: {now}\n")
+print(f"current Unix time: {now}")
+print(f"program: {PROGRAM_ID}\n")
 print("=== VaultStates ===")
 # VaultState layout: 8 disc + 1 pool_kind + 1 bump + 1 vault_bump + 8 epoch_zero(i64) + 4 period_duration_seconds(u32)
 #   + 8 open_period_id(u64) + 8 open_period_collected(u64) + 8 awaiting_settlement_total + 8 obligations_lamports
@@ -68,18 +67,6 @@ for name, pk in VAULT_STATES.items():
         else:
             expired = f"ok, expires in {period_end - now}s"
     print(f"  {name:8s} pool_kind={pool_kind} dur={period_dur:>9d}s open_period_id={open_pid} collected={open_coll} life_collected={coll_life}")
-    print(f"           epoch_zero={epoch_zero}, expiry: {expired}")
+    print(f"           epoch_zero={epoch_zero}, awaiting_settlement_total={awaiting}, obligations={obligs}, paid_lifetime={paid_life}")
+    print(f"           expiry: {expired}")
 
-print("\n=== Vault balances (lamports) ===")
-for name, pk in VAULTS.items():
-    r = rpc("getBalance", [pk])
-    bal = r["result"]["value"]
-    rent_floor = 890880  # 0-byte system account rent-exempt
-    excess = bal - rent_floor
-    print(f"  vault_{name:8s} {pk[:12]}... balance={bal:>10d}   (excess over rent ={excess})")
-
-print("\n=== Operator wallets (lamports) ===")
-for name, pk in OPS.items():
-    r = rpc("getBalance", [pk])
-    bal = r["result"]["value"]
-    print(f"  {name:8s} {pk[:12]}... balance={bal:>10d}")
