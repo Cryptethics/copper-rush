@@ -14,6 +14,7 @@
 
 'use strict';
 
+const fs = require('fs');
 const {
   fetchVaultState,
   listPendingSettlements, listPeriods,
@@ -28,19 +29,42 @@ const POOL_KIND_DAILY = 0;
 
 // ---------- CLI parsing -----------------------------------------------------
 function parseArgs(argv) {
-  const out = { cluster: 'devnet', periodId: null };
+  const out = { cluster: 'devnet', periodId: null, output: null };
   for (let i = 2; i < argv.length; i++) {
     const a = argv[i];
     if (a === '--cluster')        out.cluster  = argv[++i];
     else if (a === '--period-id') out.periodId = Number(argv[++i]);
+    else if (a === '--output')    out.output   = argv[++i];
     else if (a === '-h' || a === '--help') { printHelp(); process.exit(0); }
     else { console.error(`unknown arg: ${a}`); printHelp(); process.exit(1); }
   }
   return out;
 }
 function printHelp() {
-  console.log(`Usage: node tools/paid_daily_dry_run.js [--cluster devnet] [--period-id N]`);
+  console.log(`Usage: node tools/paid_daily_dry_run.js [--cluster devnet] [--period-id N] [--output path.json]
+
+  --output path.json   With --period-id, writes ONLY the settlement artifact
+                       (the object shape consumed by post_settlement_simulator)
+                       to the given path as valid JSON. No file is written
+                       when settlement cannot be produced (blocker paths).`);
 }
+
+// Serialize a settlement artifact object to a JSON file compatible with
+// post_settlement_simulator.js:validateArtifact — i.e. periodId, poolKind,
+// merkleRoot, winnerCount, totalPayoutLamports all present and typed as
+// simulator expects. Pure so tests can exercise it without spawning the CLI.
+function writeSettlementArtifact(outputPath, settlement) {
+  if (typeof outputPath !== 'string' || outputPath.length === 0) {
+    throw new Error('writeSettlementArtifact: outputPath required');
+  }
+  if (!settlement || typeof settlement !== 'object') {
+    throw new Error('writeSettlementArtifact: settlement required');
+  }
+  const json = JSON.stringify(settlement, null, 2);
+  fs.writeFileSync(outputPath, json + '\n');
+}
+
+module.exports = { writeSettlementArtifact };
 
 // ---------- helpers ---------------------------------------------------------
 function hdr(s) { console.log('\n== ' + s + ' =='); }
@@ -48,7 +72,7 @@ function sol(lamports) { return (Number(lamports) / 1e9).toFixed(9) + ' SOL'; }
 
 // ---------- main ------------------------------------------------------------
 async function main() {
-  const { cluster, periodId } = parseArgs(process.argv);
+  const { cluster, periodId, output } = parseArgs(process.argv);
 
   hdr(`DAILY VaultState (${cluster})`);
   const vs = await fetchVaultState(cluster, POOL_KIND_DAILY);
@@ -161,6 +185,10 @@ async function main() {
     console.log(`  algorithm:           ${JSON.stringify(res.settlement.algorithm)}`);
     console.log(`  ready for post_settlement: YES`);
     console.log(`    (would post: pool_kind=0, period_id=${periodId}, merkle_root=${res.settlement.merkleRoot}, total_payout=${res.settlement.totalPayoutLamports}, num_winners=${res.settlement.winnerCount})`);
+    if (output) {
+      writeSettlementArtifact(output, res.settlement);
+      console.log(`\n  artifact written: ${output}`);
+    }
   } else {
     hdr('BLOCKER — settlement not produced');
     console.log(`  settlementReason: ${res.settlementReason}`);
@@ -170,4 +198,6 @@ async function main() {
   process.exit(0);
 }
 
-main().catch(e => { console.error('ERROR:', e); process.exit(1); });
+if (require.main === module) {
+  main().catch(e => { console.error('ERROR:', e); process.exit(1); });
+}
