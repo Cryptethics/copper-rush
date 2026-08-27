@@ -162,11 +162,12 @@ function loadKeypairFromWsl(wslPath) {
     throw new Error(`keypair must be a 64-element JSON array (Solana keypair format), got length=${Array.isArray(arr) ? arr.length : typeof arr}`);
   }
   const sk = new Uint8Array(arr);
-  const kp = Keypair.fromSecretKey(sk);
-  // Best-effort scrub of the transient (won't stop V8 from having copies, but
-  // shortens the window during which the raw bytes sit in a named reference).
-  for (let i = 0; i < sk.length; i++) sk[i] = 0;
-  return kp;
+  // NOTE: do NOT scrub `sk` after Keypair.fromSecretKey — web3.js retains a
+  // reference to the passed Uint8Array and uses it for every subsequent
+  // signature. Zeroing it here would silently produce invalid signatures
+  // (simulate with sigVerify=false still passes; broadcast fails). The
+  // secret's exposure window equals the process lifetime.
+  return Keypair.fromSecretKey(sk);
 }
 
 // ---------- preflight + build + simulate ---------------------------------
