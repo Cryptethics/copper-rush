@@ -231,7 +231,7 @@ async function simulate({ conn, admin, artifact }) {
   tx.recentBlockhash = blockhash;
   tx.feePayer = admin.publicKey;
   tx.sign(admin);
-  const sim = await conn.simulateTransaction(tx, [admin]);
+  const sim = await conn.simulateTransaction(tx);
   return {
     pdas: {
       config:     pdas.config.toBase58(),
