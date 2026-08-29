@@ -2537,6 +2537,14 @@ button:disabled { opacity: .5; cursor: not-allowed; }
         </div>
       </div>
 
+      <!-- My Rewards (Paid V1) — populated on wallet connect from public.daily_claims.
+           Chain is the source of truth for CLAIMABLE vs CLAIMED (ClaimMarker PDA).
+           No claim button yet — discovery + status only. -->
+      <div class="panel-section mode-paid" id="myRewardsPanel" style="margin-top:8px;">
+        <div class="section-title">My Rewards</div>
+        <div id="myRewardsBody" style="font-size:12px; color:#9aa3b2; line-height:1.5;">Connect wallet to load.</div>
+      </div>
+
       <!-- Controls -->
       <div class="panel-section" style="margin-top:8px;">
         <div class="section-title">Controls</div>
@@ -2883,6 +2891,163 @@ button:disabled { opacity: .5; cursor: not-allowed; }
       }
     },
   };
+
+  // ----------------------------
+  // MyClaimsAPI — Paid V1 rewards discovery (read-only).
+  // ----------------------------
+  // Uses only the publishable anon key: SELECT-only via daily_claims RLS.
+  // ClaimMarker PDA existence on-chain is the sole source of truth for
+  // CLAIMABLE vs CLAIMED — never trust a mutable DB flag. Mirrors the pure
+  // helpers in tools/my_claims.js (locked by tests). No transaction here.
+  const MyClaimsAPI = (function () {
+    const COPPER_PROGRAM_ID_STR = "EdYmMfzFidw4epQkBBiEP3bzJLYRGbKe6uqUuqq1Ggsg";
+    const RPC_ACCOUNT_BATCH = 100;
+
+    function u64leBytes(v) {
+      const b = new Uint8Array(8);
+      let n = BigInt(v);
+      for (let i = 0; i < 8; i++) { b[i] = Number(n & 0xffn); n >>= 8n; }
+      return b;
+    }
+    function u32leBytes(v) {
+      const b = new Uint8Array(4);
+      let n = v >>> 0;
+      for (let i = 0; i < 4; i++) { b[i] = (n >>> (8 * i)) & 0xff; }
+      return b;
+    }
+    function validateRow(row) {
+      if (!row || typeof row !== "object") throw new Error("row must be object");
+      if (!Number.isInteger(row.pool_kind) || row.pool_kind < 0 || row.pool_kind > 3) throw new Error("pool_kind out of range");
+      const pid = Number(row.period_id);
+      if (!Number.isInteger(pid) || pid < 0 || pid > Number.MAX_SAFE_INTEGER) throw new Error("period_id invalid");
+      if (!Number.isInteger(row.leaf_index) || row.leaf_index < 0 || row.leaf_index > 0xffff_ffff) throw new Error("leaf_index invalid");
+    }
+    function derivePeriodPda(poolKind, periodId) {
+      const { PublicKey } = solanaWeb3;
+      const [pda] = PublicKey.findProgramAddressSync(
+        [new TextEncoder().encode("period"), Uint8Array.of(poolKind & 0xff), u64leBytes(periodId)],
+        new PublicKey(COPPER_PROGRAM_ID_STR),
+      );
+      return pda;
+    }
+    function deriveClaimMarkerPda(periodPda, leafIndex) {
+      const { PublicKey } = solanaWeb3;
+      const [pda] = PublicKey.findProgramAddressSync(
+        [new TextEncoder().encode("claim"), periodPda.toBuffer(), u32leBytes(leafIndex)],
+        new PublicKey(COPPER_PROGRAM_ID_STR),
+      );
+      return pda;
+    }
+    function chunkForRpc(items, maxSize = RPC_ACCOUNT_BATCH) {
+      const out = [];
+      for (let i = 0; i < items.length; i += maxSize) out.push(items.slice(i, i + maxSize));
+      return out;
+    }
+    function lamportsToSolString(lam) {
+      const v = Number(lam);
+      if (v === 0) return "0";
+      return (v / 1_000_000_000).toFixed(9).replace(/(\.\d*?)0+$/, "$1").replace(/\.$/, "");
+    }
+    function classifyStatus(accountInfo) {
+      return accountInfo == null ? "CLAIMABLE" : "CLAIMED";
+    }
+
+    async function fetchClaimsForWallet(wallet) {
+      if (!supabaseEnabled() || !wallet) return [];
+      const url = "daily_claims?select=pool_kind,period_id,leaf_index,wallet,rank,amount_lamports,proof,merkle_root,settlement_signature,published_at" +
+                  "&wallet=eq." + encodeURIComponent(wallet) +
+                  "&order=period_id.desc";
+      const res = await sbFetch(url);
+      if (!res.ok) throw new Error("Supabase SELECT failed: HTTP " + res.status);
+      const rows = await res.json();
+      if (!Array.isArray(rows)) throw new Error("Supabase returned non-array");
+      for (const r of rows) validateRow(r);
+      return rows;
+    }
+
+    async function fetchClaimMarkerAccounts(pubkeys) {
+      if (pubkeys.length === 0) return [];
+      const { Connection } = solanaWeb3;
+      const conn = new Connection(SOLANA_RPC_URL, "confirmed");
+      const out = [];
+      const chunks = chunkForRpc(pubkeys.map(pk => pk.toBase58()), RPC_ACCOUNT_BATCH);
+      for (const chunk of chunks) {
+        const r = await conn.getMultipleAccountsInfo(
+          chunk.map(s => new solanaWeb3.PublicKey(s)),
+          "confirmed",
+        );
+        for (const v of r) out.push(v);
+      }
+      return out;
+    }
+
+    // Public: returns [{ row, periodPda, claimMarker, status, amountSol }, ...]
+    async function loadForWallet(wallet) {
+      const rows = await fetchClaimsForWallet(wallet);
+      if (rows.length === 0) return [];
+      const derived = rows.map(row => {
+        const periodPda   = derivePeriodPda(row.pool_kind, row.period_id);
+        const claimMarker = deriveClaimMarkerPda(periodPda, row.leaf_index);
+        return { row, periodPda, claimMarker };
+      });
+      const accs = await fetchClaimMarkerAccounts(derived.map(d => d.claimMarker));
+      return derived.map((d, i) => ({
+        row:       d.row,
+        periodPda: d.periodPda,
+        claimMarker: d.claimMarker,
+        status:    classifyStatus(accs[i]),
+        amountSol: lamportsToSolString(d.row.amount_lamports),
+      }));
+    }
+
+    return { loadForWallet, derivePeriodPda, deriveClaimMarkerPda, classifyStatus, chunkForRpc, lamportsToSolString };
+  })();
+
+  // Renders the My Rewards panel from a MyClaimsAPI.loadForWallet(...) result.
+  function renderMyRewards(state) {
+    const body = document.getElementById("myRewardsBody");
+    if (!body) return;
+    if (state.error) {
+      body.innerHTML = '<span style="color:#ff8888;">Failed to load rewards. </span><a href="#" id="myRewardsRetry" style="color:#7ee787;">Retry</a>';
+      const retry = document.getElementById("myRewardsRetry");
+      if (retry) retry.onclick = (e) => { e.preventDefault(); refreshMyRewards(walletPublicKey); };
+      return;
+    }
+    if (state.loading) { body.innerHTML = "Loading..."; return; }
+    if (!state.rewards || state.rewards.length === 0) {
+      body.innerHTML = '<span style="opacity:0.7;">No rewards yet.</span>';
+      return;
+    }
+    const rows = state.rewards.map(r => {
+      const isClaimed = r.status === "CLAIMED";
+      const badgeColor = isClaimed ? "#9aa3b2" : "#7ee787";
+      const badgeText  = isClaimed ? "Claimed" : "Available";
+      return '' +
+        '<div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0;border-bottom:1px solid #1e2530;">' +
+          '<div>' +
+            '<div style="color:#c9d1d9;">Daily #' + String(r.row.period_id) + '</div>' +
+            '<div class="mono" style="color:#ffb347;font-size:11px;">' + r.amountSol + ' SOL</div>' +
+          '</div>' +
+          '<span style="color:' + badgeColor + ';font-size:11px;font-weight:600;">' + badgeText + '</span>' +
+        '</div>';
+    }).join("");
+    body.innerHTML = rows;
+  }
+
+  async function refreshMyRewards(wallet) {
+    if (!wallet) { renderMyRewards({ rewards: [] }); return; }
+    renderMyRewards({ loading: true });
+    try {
+      const rewards = await MyClaimsAPI.loadForWallet(wallet);
+      // Guard against wallet-changed-mid-fetch
+      if (walletPublicKey !== wallet) return;
+      renderMyRewards({ rewards });
+    } catch (e) {
+      console.warn("[MyRewards] load failed:", e && e.message);
+      if (walletPublicKey !== wallet) return;
+      renderMyRewards({ error: true });
+    }
+  }
 
   // ----------------------------
   // Player progress (paid mode all-time stats per wallet)
@@ -8099,6 +8264,9 @@ button:disabled { opacity: .5; cursor: not-allowed; }
     // Fetch and display SOL balance
     fetchSolBalance(walletPublicKey);
 
+    // My Rewards discovery (Paid V1) — read-only. Fires-and-forgets.
+    refreshMyRewards(walletPublicKey);
+
     // Check for existing username claim + load map/corner progress
     setNicknameStatus("Checking nickname...", "info");
     // One-shot legacy migration: attribute any leftover global allTime values
@@ -8157,6 +8325,11 @@ button:disabled { opacity: .5; cursor: not-allowed; }
     // Panel UI
     panelWalletEl.style.display = "none";
     elSolBalance.textContent = "- SOL";
+
+    // Clear My Rewards panel
+    renderMyRewards({ rewards: [] });
+    const rBody = document.getElementById("myRewardsBody");
+    if (rBody) rBody.innerHTML = "Connect wallet to load.";
 
     // Disable paid play
     if (btnPlayPaid) btnPlayPaid.disabled = true;
