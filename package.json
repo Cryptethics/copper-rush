@@ -13,7 +13,7 @@
     "uuid": "9.0.1"
   },
   "scripts": {
-    "test": "node tools/payout_engine.test.js && node tools/daily_settlement_builder.test.js && node tools/daily_leaderboard_ranker.test.js && node tools/daily_period_boundaries.test.js && node tools/paid_daily_ingestor.test.js && node tools/copper_rpc_reader.test.js && node tools/post_settlement_simulator.test.js && node tools/paid_daily_dry_run.test.js && node tools/claim_cli.test.js",
+    "test": "node tools/payout_engine.test.js && node tools/daily_settlement_builder.test.js && node tools/daily_leaderboard_ranker.test.js && node tools/daily_period_boundaries.test.js && node tools/paid_daily_ingestor.test.js && node tools/copper_rpc_reader.test.js && node tools/post_settlement_simulator.test.js && node tools/paid_daily_dry_run.test.js && node tools/claim_cli.test.js && node tools/publish_daily_claims.test.js",
     "stress": "node tools/payout_engine.stress.js"
   }
 }
