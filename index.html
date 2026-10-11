@@ -1107,6 +1107,82 @@ button:disabled { opacity: .5; cursor: not-allowed; }
     body.free-mode .mode-paid { display: none !important; }
     body:not(.free-mode) .mode-free { display: none !important; }
     body.free-mode #panelWallet { display: none !important; }
+
+    /* Free Tournament public mode — hide all Paid / wallet surfaces + make
+       the landing Prize Pool non-clickable. Paid DOM stays in place; CSS
+       is the only thing that hides it. See FREE_TOURNAMENT_MODE flag. */
+    body.free-tournament #btnPlayPaid,
+    body.free-tournament #wallet-area,
+    body.free-tournament #walletInstallHint,
+    body.free-tournament #walletStatus,
+    body.free-tournament #btnConnectWallet,
+    body.free-tournament #landing-prize-pool { display: none !important; }
+
+    /* Free Tournament landing panel — shown only when FREE_TOURNAMENT_MODE
+       is on. Collapsed-pill aesthetic matching the Daily Mutator / Prize
+       Pool cards. */
+    #landingTournament {
+      margin: 12px auto 8px;
+      max-width: 420px;
+      padding: 10px 14px;
+      border-radius: 8px;
+      background: linear-gradient(180deg, rgba(126,231,135,0.08), rgba(126,231,135,0.02));
+      border: 1px solid rgba(126,231,135,0.25);
+      text-align: left;
+      font-size: 12px;
+      color: #c9d1d9;
+    }
+    #landingTournament .lt-title {
+      font-size: 10.5px;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      color: #7ee787;
+      opacity: 0.85;
+      font-weight: 600;
+      margin-bottom: 4px;
+    }
+    #landingTournament .lt-window {
+      font-size: 10.5px;
+      color: #9aa3b2;
+      margin-bottom: 8px;
+    }
+    #landingTournament .lt-prizes {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+      margin-bottom: 8px;
+      font-size: 10.5px;
+    }
+    #landingTournament .lt-prize {
+      padding: 2px 6px;
+      border-radius: 4px;
+      background: rgba(255,179,71,0.14);
+      color: #ffb347;
+      font-weight: 600;
+    }
+    #landingTournament .lt-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 3px 0;
+      border-bottom: 1px dotted rgba(255,255,255,0.07);
+      font-size: 12px;
+    }
+    #landingTournament .lt-row:last-child { border-bottom: none; }
+    #landingTournament .lt-rank { color: #9aa3b2; width: 28px; }
+    #landingTournament .lt-nick { flex: 1; color: #c9d1d9; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    #landingTournament .lt-score { color: #ffb347; font-family: ui-monospace, Menlo, monospace; }
+    #landingTournament .lt-note {
+      font-size: 10px;
+      color: #9aa3b2;
+      opacity: 0.65;
+      margin-top: 8px;
+      line-height: 1.4;
+    }
+    #landingTournament .lt-retry {
+      color: #7ee787;
+      cursor: pointer;
+      text-decoration: underline;
+    }
     body.free-mode .end-actions .btn-redeem,
     body.free-mode .end-weekly-toggle,
     body.free-mode #endWeeklyDetails {
@@ -2273,6 +2349,17 @@ button:disabled { opacity: .5; cursor: not-allowed; }
         <button id="btnPlayFree">&#9654; Play Free Demo</button>
       </div>
 
+      <!-- Free Tournament leaderboard — populated only when FREE_TOURNAMENT_MODE
+           is on. Fixed 7-day window, UTC-aligned. Top 5, prizes $40/$25/$15/$12/$8.
+           Group by device_id; nickname shown is X handle. -->
+      <div id="landingTournament" style="display:none;">
+        <div class="lt-title" id="ltTitle">Free Tournament</div>
+        <div class="lt-window" id="ltWindow">—</div>
+        <div class="lt-prizes" id="ltPrizes"></div>
+        <div id="ltBody">Loading…</div>
+        <div class="lt-note">Payouts via DM to the matching X handle (nickname = @handle).</div>
+      </div>
+
       <button type="button" class="htp-toggle" aria-expanded="false" aria-controls="landing-rules">How to Play</button>
       <div class="landing-rules" id="landing-rules">
         &#9656; Collect <b style="color:#ffb347;">copper nuggets</b> and <b style="color:#8bb8ff;">diamonds</b> before time runs out<br>
@@ -2535,6 +2622,14 @@ button:disabled { opacity: .5; cursor: not-allowed; }
           <span class="k">Top 40% win</span>
           <span class="v mono" id="panelWinners">-</span>
         </div>
+      </div>
+
+      <!-- My Rewards (Paid V1) — populated on wallet connect from public.daily_claims.
+           Chain is the source of truth for CLAIMABLE vs CLAIMED (ClaimMarker PDA).
+           No claim button yet — discovery + status only. -->
+      <div class="panel-section mode-paid" id="myRewardsPanel" style="margin-top:8px;">
+        <div class="section-title">My Rewards</div>
+        <div id="myRewardsBody" style="font-size:12px; color:#9aa3b2; line-height:1.5;">Connect wallet to load.</div>
       </div>
 
       <!-- Controls -->
@@ -2813,6 +2908,38 @@ button:disabled { opacity: .5; cursor: not-allowed; }
 <script>
 (() => {
   // ----------------------------
+  // Free Tournament public mode
+  // ----------------------------
+  // When true: hides all Paid / wallet / Phantom / Solana surfaces AND the
+  // Prize Pool pill on the landing page, promotes the free play button.
+  // No on-chain reads, no wallet code ever runs. Paid code stays in the
+  // file — flipping this to false restores the previous Paid behavior
+  // byte-for-byte.
+  const FREE_TOURNAMENT_MODE = true;
+
+  // Tournament activation switch — separate from FREE_TOURNAMENT_MODE on
+  // purpose. FREE_TOURNAMENT_MODE hides Paid surfaces (public launch mode);
+  // TOURNAMENT_ACTIVE enables the Free Tournament leaderboard UI + fetches.
+  //
+  // When TOURNAMENT_ACTIVE === false (current state):
+  //   - zero Supabase requests for daily_claims-style tournament data
+  //   - the Free Tournament landing panel stays hidden (default display:none)
+  //   - no prize references in the UI
+  //
+  // Flip to true + verify TOURNAMENT_START_UTC/END/PRIZES below to turn the
+  // tournament live. Scoring formula does NOT change when flipping.
+  const TOURNAMENT_ACTIVE = false;
+
+  // Tournament window — MUST be a Monday 00:00 UTC. End = start + 7 days.
+  // Change TOURNAMENT_START_UTC to roll a new tournament; one week only.
+  // Prize payouts are manual via DM to the matching X handle (nickname).
+  const TOURNAMENT_START_UTC = "2026-10-19T00:00:00.000Z";       // Mon
+  const TOURNAMENT_END_UTC   = "2026-10-26T00:00:00.000Z";       // Mon
+  const TOURNAMENT_PRIZES_USD = [40, 25, 15, 12, 8];
+  const TOURNAMENT_PAGE_SIZE = 1000;
+  const TOURNAMENT_SAFETY_CAP_ROWS = 500000;
+
+  // ----------------------------
   // Supabase config — fill in your project URL and anon key to enable online leaderboard
   // ----------------------------
   const SUPABASE_URL = "https://dfcccaxcamnsyaevyhqz.supabase.co";
@@ -2883,6 +3010,377 @@ button:disabled { opacity: .5; cursor: not-allowed; }
       }
     },
   };
+
+  // ----------------------------
+  // MyClaimsAPI — Paid V1 rewards discovery (read-only).
+  // ----------------------------
+  // Uses only the publishable anon key: SELECT-only via daily_claims RLS.
+  // ClaimMarker PDA existence on-chain is the sole source of truth for
+  // CLAIMABLE vs CLAIMED — never trust a mutable DB flag. Mirrors the pure
+  // helpers in tools/my_claims.js (locked by tests). No transaction here.
+  const MyClaimsAPI = (function () {
+    const COPPER_PROGRAM_ID_STR = "EdYmMfzFidw4epQkBBiEP3bzJLYRGbKe6uqUuqq1Ggsg";
+    const RPC_ACCOUNT_BATCH = 100;
+
+    function u64leBytes(v) {
+      const b = new Uint8Array(8);
+      let n = BigInt(v);
+      for (let i = 0; i < 8; i++) { b[i] = Number(n & 0xffn); n >>= 8n; }
+      return b;
+    }
+    function u32leBytes(v) {
+      const b = new Uint8Array(4);
+      let n = v >>> 0;
+      for (let i = 0; i < 4; i++) { b[i] = (n >>> (8 * i)) & 0xff; }
+      return b;
+    }
+    function validateRow(row) {
+      if (!row || typeof row !== "object") throw new Error("row must be object");
+      if (!Number.isInteger(row.pool_kind) || row.pool_kind < 0 || row.pool_kind > 3) throw new Error("pool_kind out of range");
+      const pid = Number(row.period_id);
+      if (!Number.isInteger(pid) || pid < 0 || pid > Number.MAX_SAFE_INTEGER) throw new Error("period_id invalid");
+      if (!Number.isInteger(row.leaf_index) || row.leaf_index < 0 || row.leaf_index > 0xffff_ffff) throw new Error("leaf_index invalid");
+    }
+    function derivePeriodPda(poolKind, periodId) {
+      const { PublicKey } = solanaWeb3;
+      const [pda] = PublicKey.findProgramAddressSync(
+        [new TextEncoder().encode("period"), Uint8Array.of(poolKind & 0xff), u64leBytes(periodId)],
+        new PublicKey(COPPER_PROGRAM_ID_STR),
+      );
+      return pda;
+    }
+    function deriveClaimMarkerPda(periodPda, leafIndex) {
+      const { PublicKey } = solanaWeb3;
+      const [pda] = PublicKey.findProgramAddressSync(
+        [new TextEncoder().encode("claim"), periodPda.toBuffer(), u32leBytes(leafIndex)],
+        new PublicKey(COPPER_PROGRAM_ID_STR),
+      );
+      return pda;
+    }
+    function chunkForRpc(items, maxSize = RPC_ACCOUNT_BATCH) {
+      const out = [];
+      for (let i = 0; i < items.length; i += maxSize) out.push(items.slice(i, i + maxSize));
+      return out;
+    }
+    function lamportsToSolString(lam) {
+      const v = Number(lam);
+      if (v === 0) return "0";
+      return (v / 1_000_000_000).toFixed(9).replace(/(\.\d*?)0+$/, "$1").replace(/\.$/, "");
+    }
+    function classifyStatus(accountInfo) {
+      return accountInfo == null ? "CLAIMABLE" : "CLAIMED";
+    }
+
+    async function fetchClaimsForWallet(wallet) {
+      if (!supabaseEnabled() || !wallet) return [];
+      const url = "daily_claims?select=pool_kind,period_id,leaf_index,wallet,rank,amount_lamports,proof,merkle_root,settlement_signature,published_at" +
+                  "&wallet=eq." + encodeURIComponent(wallet) +
+                  "&order=period_id.desc";
+      const res = await sbFetch(url);
+      if (!res.ok) throw new Error("Supabase SELECT failed: HTTP " + res.status);
+      const rows = await res.json();
+      if (!Array.isArray(rows)) throw new Error("Supabase returned non-array");
+      for (const r of rows) validateRow(r);
+      return rows;
+    }
+
+    async function fetchClaimMarkerAccounts(pubkeys) {
+      if (pubkeys.length === 0) return [];
+      const { Connection } = solanaWeb3;
+      const conn = new Connection(SOLANA_RPC_URL, "confirmed");
+      const out = [];
+      const chunks = chunkForRpc(pubkeys.map(pk => pk.toBase58()), RPC_ACCOUNT_BATCH);
+      for (const chunk of chunks) {
+        const r = await conn.getMultipleAccountsInfo(
+          chunk.map(s => new solanaWeb3.PublicKey(s)),
+          "confirmed",
+        );
+        for (const v of r) out.push(v);
+      }
+      return out;
+    }
+
+    // Public: returns [{ row, periodPda, claimMarker, status, amountSol }, ...]
+    async function loadForWallet(wallet) {
+      const rows = await fetchClaimsForWallet(wallet);
+      if (rows.length === 0) return [];
+      const derived = rows.map(row => {
+        const periodPda   = derivePeriodPda(row.pool_kind, row.period_id);
+        const claimMarker = deriveClaimMarkerPda(periodPda, row.leaf_index);
+        return { row, periodPda, claimMarker };
+      });
+      const accs = await fetchClaimMarkerAccounts(derived.map(d => d.claimMarker));
+      return derived.map((d, i) => ({
+        row:       d.row,
+        periodPda: d.periodPda,
+        claimMarker: d.claimMarker,
+        status:    classifyStatus(accs[i]),
+        amountSol: lamportsToSolString(d.row.amount_lamports),
+      }));
+    }
+
+    return { loadForWallet, derivePeriodPda, deriveClaimMarkerPda, classifyStatus, chunkForRpc, lamportsToSolString };
+  })();
+
+  // Renders the My Rewards panel from a MyClaimsAPI.loadForWallet(...) result.
+  function renderMyRewards(state) {
+    const body = document.getElementById("myRewardsBody");
+    if (!body) return;
+    if (state.error) {
+      body.innerHTML = '<span style="color:#ff8888;">Failed to load rewards. </span><a href="#" id="myRewardsRetry" style="color:#7ee787;">Retry</a>';
+      const retry = document.getElementById("myRewardsRetry");
+      if (retry) retry.onclick = (e) => { e.preventDefault(); refreshMyRewards(walletPublicKey); };
+      return;
+    }
+    if (state.loading) { body.innerHTML = "Loading..."; return; }
+    if (!state.rewards || state.rewards.length === 0) {
+      body.innerHTML = '<span style="opacity:0.7;">No rewards yet.</span>';
+      return;
+    }
+    const rows = state.rewards.map(r => {
+      const isClaimed = r.status === "CLAIMED";
+      const badgeColor = isClaimed ? "#9aa3b2" : "#7ee787";
+      const badgeText  = isClaimed ? "Claimed" : "Available";
+      return '' +
+        '<div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0;border-bottom:1px solid #1e2530;">' +
+          '<div>' +
+            '<div style="color:#c9d1d9;">Daily #' + String(r.row.period_id) + '</div>' +
+            '<div class="mono" style="color:#ffb347;font-size:11px;">' + r.amountSol + ' SOL</div>' +
+          '</div>' +
+          '<span style="color:' + badgeColor + ';font-size:11px;font-weight:600;">' + badgeText + '</span>' +
+        '</div>';
+    }).join("");
+    body.innerHTML = rows;
+  }
+
+  async function refreshMyRewards(wallet) {
+    if (!wallet) { renderMyRewards({ rewards: [] }); return; }
+    renderMyRewards({ loading: true });
+    try {
+      const rewards = await MyClaimsAPI.loadForWallet(wallet);
+      // Guard against wallet-changed-mid-fetch
+      if (walletPublicKey !== wallet) return;
+      renderMyRewards({ rewards });
+    } catch (e) {
+      console.warn("[MyRewards] load failed:", e && e.message);
+      if (walletPublicKey !== wallet) return;
+      renderMyRewards({ error: true });
+    }
+  }
+
+  // ----------------------------
+  // TournamentAPI — Free Tournament leaderboard (public free mode only).
+  // ----------------------------
+  // Reads scores_free with keyset pagination; joins to free_players for the
+  // canonical nickname. Groups by device_id — same cheater posture as Weekly
+  // Free (identification not combined across devices automatically). Formula
+  // reuses the existing Free computeDailyScore(): tournamentScore = sum of
+  // daily scores across the 7 UTC days of the tournament window.
+  // Server-time source: PostgREST returns created_at that was set by the DB
+  // trigger-less default (now()); client-side timestamps are never trusted
+  // for filtering (filter is on created_at, not Date.now()).
+  //
+  // Pure helpers are mirrored in tools/tournament_leaderboard.js (tested).
+  const TournamentAPI = (function () {
+    function utcDayKey(ts) {
+      const d = new Date(ts);
+      const yy = d.getUTCFullYear();
+      const mm = String(d.getUTCMonth() + 1).padStart(2, "0");
+      const dd = String(d.getUTCDate()).padStart(2, "0");
+      return yy + "-" + mm + "-" + dd;
+    }
+
+    // Keyset pagination on (created_at, id). Throws on any error; never
+    // returns a partial set — callers surface the failure instead of
+    // showing an incomplete leaderboard.
+    async function fetchAllRowsInWindow(startISO, endISO) {
+      let cursorTs = null;   // null = first page uses only created_at >= start
+      let cursorId = null;
+      let total = 0;
+      const out = [];
+      // Loop at most ceil(cap / page) + 1 times
+      const maxPages = Math.ceil(TOURNAMENT_SAFETY_CAP_ROWS / TOURNAMENT_PAGE_SIZE) + 1;
+      for (let p = 0; p < maxPages; p++) {
+        let q = "scores_free?select=id,device_id,nickname,score,created_at" +
+                "&created_at=lt." + encodeURIComponent(endISO) +
+                "&order=created_at.asc,id.asc" +
+                "&limit=" + TOURNAMENT_PAGE_SIZE;
+        if (cursorTs === null) {
+          q += "&created_at=gte." + encodeURIComponent(startISO);
+        } else {
+          // (created_at > cursorTs) OR (created_at == cursorTs AND id > cursorId)
+          q += "&or=(created_at.gt." + encodeURIComponent(cursorTs) +
+               ",and(created_at.eq." + encodeURIComponent(cursorTs) +
+               ",id.gt." + cursorId + "))";
+        }
+        const r = await sbFetch(q);
+        if (!r.ok) throw new Error("Supabase fetch failed: HTTP " + r.status);
+        const batch = await r.json();
+        if (!Array.isArray(batch)) throw new Error("Supabase returned non-array");
+        if (batch.length === 0) break;
+        out.push.apply(out, batch);
+        total += batch.length;
+        if (total > TOURNAMENT_SAFETY_CAP_ROWS) {
+          throw new Error("safety cap reached (" + TOURNAMENT_SAFETY_CAP_ROWS + " rows)");
+        }
+        if (batch.length < TOURNAMENT_PAGE_SIZE) break;
+        const last = batch[batch.length - 1];
+        cursorTs = last.created_at;
+        cursorId = last.id;
+      }
+      return out;
+    }
+
+    async function fetchFreePlayersForDeviceIds(deviceIds) {
+      const unique = Array.from(new Set(deviceIds.filter(Boolean)));
+      if (unique.length === 0) return new Map();
+      // PostgREST in.() URL-length is bounded; chunk by 100 ids per request.
+      const CHUNK = 100;
+      const byDevice = new Map();
+      for (let i = 0; i < unique.length; i += CHUNK) {
+        const slice = unique.slice(i, i + CHUNK);
+        const list = slice.map(encodeURIComponent).join(",");
+        const q = "free_players?select=device_id,nickname&device_id=in.(" + list + ")";
+        const r = await sbFetch(q);
+        if (!r.ok) throw new Error("free_players fetch failed: HTTP " + r.status);
+        const rows = await r.json();
+        if (!Array.isArray(rows)) throw new Error("free_players non-array response");
+        for (const row of rows) {
+          if (row && row.device_id && typeof row.nickname === "string") {
+            byDevice.set(row.device_id, row.nickname);
+          }
+        }
+      }
+      return byDevice;
+    }
+
+    function aggregate(rows, freePlayersByDeviceId, windowStartMs, windowEndMs) {
+      const byPlayer = new Map();
+      for (const r of rows) {
+        const ts = new Date(r.created_at).getTime();
+        if (!Number.isFinite(ts) || ts < windowStartMs || ts >= windowEndMs) continue;
+        const score = Number(r.score);
+        if (!Number.isFinite(score) || score < 0) continue;
+        const key = r.device_id ? "dev:" + r.device_id : "legacy:" + r.id;
+        const dayKey = utcDayKey(ts);
+        if (!byPlayer.has(key)) {
+          byPlayer.set(key, {
+            device_id: r.device_id || null,
+            nickname:  (typeof r.nickname === "string" && r.nickname) || "Anonymous",
+            isLegacy:  !r.device_id,
+            days:      new Map(),
+            totalRuns: 0,
+          });
+        }
+        const data = byPlayer.get(key);
+        if (!data.days.has(dayKey)) data.days.set(dayKey, []);
+        data.days.get(dayKey).push(Math.floor(score));
+        data.totalRuns++;
+      }
+      const players = [];
+      for (const [, data] of byPlayer) {
+        let tournamentScore = 0;
+        for (const [, scores] of data.days) {
+          const daily = computeDailyScore(scores);
+          tournamentScore += daily.dailyScore;
+        }
+        const canonical = data.device_id ? freePlayersByDeviceId.get(data.device_id) : null;
+        players.push({
+          device_id: data.device_id,
+          nickname:  (canonical && canonical.length) ? canonical : data.nickname,
+          isLegacy:  data.isLegacy,
+          tournamentScore,
+          daysPlayed: data.days.size,
+          totalRuns:  data.totalRuns,
+        });
+      }
+      players.sort((a, b) => {
+        if (b.tournamentScore !== a.tournamentScore) return b.tournamentScore - a.tournamentScore;
+        if (b.daysPlayed      !== a.daysPlayed)      return b.daysPlayed      - a.daysPlayed;
+        return (a.nickname || "").localeCompare(b.nickname || "");
+      });
+      return players;
+    }
+
+    async function loadTop5() {
+      const startMs = Date.parse(TOURNAMENT_START_UTC);
+      const endMs   = Date.parse(TOURNAMENT_END_UTC);
+      if (!Number.isFinite(startMs) || !Number.isFinite(endMs) || endMs <= startMs) {
+        throw new Error("invalid tournament window");
+      }
+      const rows = await fetchAllRowsInWindow(TOURNAMENT_START_UTC, TOURNAMENT_END_UTC);
+      const deviceIds = rows.map(r => r.device_id).filter(Boolean);
+      const freePlayers = await fetchFreePlayersForDeviceIds(deviceIds);
+      const ranked = aggregate(rows, freePlayers, startMs, endMs);
+      return ranked.slice(0, 5);
+    }
+
+    return { loadTop5, utcDayKey, aggregate };
+  })();
+
+  function renderTournament(state) {
+    const el = document.getElementById("landingTournament");
+    const body = document.getElementById("ltBody");
+    const windowEl = document.getElementById("ltWindow");
+    const prizesEl = document.getElementById("ltPrizes");
+    if (!el || !body) return;
+    if (!FREE_TOURNAMENT_MODE || !TOURNAMENT_ACTIVE) { el.style.display = "none"; return; }
+    el.style.display = "";
+
+    const startISO = TOURNAMENT_START_UTC.slice(0, 10);
+    const endISO   = TOURNAMENT_END_UTC.slice(0, 10);
+    if (windowEl) windowEl.textContent = startISO + " → " + endISO + " (UTC)";
+    if (prizesEl && !prizesEl.firstChild) {
+      prizesEl.innerHTML = "";
+      const labels = ["1st", "2nd", "3rd", "4th", "5th"];
+      TOURNAMENT_PRIZES_USD.forEach((usd, i) => {
+        const sp = document.createElement("span");
+        sp.className = "lt-prize";
+        sp.textContent = labels[i] + " $" + usd;
+        prizesEl.appendChild(sp);
+      });
+    }
+
+    if (state.loading)  { body.textContent = "Loading…"; return; }
+    if (state.error)    {
+      body.innerHTML = '<span style="color:#ff8888;">Could not load leaderboard. </span>' +
+                       '<span class="lt-retry" id="ltRetry">Retry</span>';
+      const btn = document.getElementById("ltRetry");
+      if (btn) btn.onclick = () => refreshTournament();
+      return;
+    }
+    if (!state.top5 || state.top5.length === 0) {
+      body.innerHTML = '<span style="opacity:0.6;">No scores yet.</span>';
+      return;
+    }
+    const now = Date.now();
+    const startMs = Date.parse(TOURNAMENT_START_UTC);
+    const endMs   = Date.parse(TOURNAMENT_END_UTC);
+    let statusLine = "";
+    if (now < startMs)      statusLine = '<div style="font-size:10.5px;color:#9aa3b2;margin-bottom:6px;">Tournament has not started yet.</div>';
+    else if (now >= endMs)  statusLine = '<div style="font-size:10.5px;color:#9aa3b2;margin-bottom:6px;">Tournament ended — final Top 5.</div>';
+    const rows = state.top5.map((p, i) => {
+      const safeNick = String(p.nickname).replace(/[<>&"]/g, "");
+      return '<div class="lt-row">' +
+             '<span class="lt-rank">#' + (i + 1) + '</span>' +
+             '<span class="lt-nick">' + safeNick + '</span>' +
+             '<span class="lt-score">' + p.tournamentScore.toLocaleString("en-US") + '</span>' +
+             '</div>';
+    }).join("");
+    body.innerHTML = statusLine + rows;
+  }
+
+  async function refreshTournament() {
+    if (!FREE_TOURNAMENT_MODE || !TOURNAMENT_ACTIVE) return;
+    renderTournament({ loading: true });
+    try {
+      const top5 = await TournamentAPI.loadTop5();
+      renderTournament({ top5 });
+    } catch (e) {
+      console.warn("[Tournament] load failed:", e && e.message);
+      renderTournament({ error: true });
+    }
+  }
 
   // ----------------------------
   // Player progress (paid mode all-time stats per wallet)
@@ -3311,6 +3809,7 @@ button:disabled { opacity: .5; cursor: not-allowed; }
           prefer: "return=minimal",
           body: JSON.stringify({
             nickname: record.nickname || "Anonymous",
+            wallet: record.wallet || null,
             score: record.score,
             copper: record.copper,
             lb50: lb50_count,
@@ -4343,13 +4842,15 @@ button:disabled { opacity: .5; cursor: not-allowed; }
   const COPPER_COUNT = 200;
   const EXCLUDE_R = 2;            // manhattan radius from starts
   const FOG_R = 2;                // tiles radius visible
-  // Developer mode. In the source (gameplay-v1) branch, ?dev=1 activates
-  // a floating dev panel with map/mutator/fog/audit/seed toggles. In this
-  // public build (gh-pages) DEV_TOOLS_ENABLED is hard-coded to false so
-  // ?dev=1 has no effect — the panel is never initialised, no listeners
-  // are attached, no localStorage state is read. This is a UX gate, NOT
-  // anti-cheat; a determined user can still monkey-patch the constant.
-  const DEV_TOOLS_ENABLED = false;
+  // Developer mode. Public game (no ?dev=1) sees zero audit UI and a
+  // fully normal play loop. With ?dev=1, a floating panel appears with
+  // every toggle (map, mutator, fog, audit, seed). Panel state lives in
+  // localStorage so reopening with ?dev=1 restores the prior config.
+  // No other query string is recognized — ?dev=1 is the only switch.
+  const DEV_TOOLS_ENABLED = (function () {
+    try { return new URLSearchParams(location.search).get("dev") === "1"; }
+    catch (e) { return false; }
+  })();
   const DEV_LS_KEY = "copper_rush_dev_panel_v1";
   function _devDefaults() {
     return { map: "", mutator: "", seed: "", noFog: false, mapAudit: false, mobileControls: "joystick" };
@@ -8096,6 +8597,9 @@ button:disabled { opacity: .5; cursor: not-allowed; }
     // Fetch and display SOL balance
     fetchSolBalance(walletPublicKey);
 
+    // My Rewards discovery (Paid V1) — read-only. Fires-and-forgets.
+    refreshMyRewards(walletPublicKey);
+
     // Check for existing username claim + load map/corner progress
     setNicknameStatus("Checking nickname...", "info");
     // One-shot legacy migration: attribute any leftover global allTime values
@@ -8154,6 +8658,11 @@ button:disabled { opacity: .5; cursor: not-allowed; }
     // Panel UI
     panelWalletEl.style.display = "none";
     elSolBalance.textContent = "- SOL";
+
+    // Clear My Rewards panel
+    renderMyRewards({ rewards: [] });
+    const rBody = document.getElementById("myRewardsBody");
+    if (rBody) rBody.innerHTML = "Connect wallet to load.";
 
     // Disable paid play
     if (btnPlayPaid) btnPlayPaid.disabled = true;
@@ -9023,17 +9532,38 @@ button:disabled { opacity: .5; cursor: not-allowed; }
     if (!pools) ppSubEl.textContent = "Could not load prize pool";
   }
 
-  // Prize pool click → breakdown page
+  // Prize pool click → breakdown page (skipped in Free Tournament mode;
+  // the pill is fully hidden via CSS, never clickable, never fetched).
   const landingPrizePoolEl = document.getElementById("landing-prize-pool");
-  if (landingPrizePoolEl) {
+  if (!FREE_TOURNAMENT_MODE && landingPrizePoolEl) {
     landingPrizePoolEl.addEventListener("click", () => {
       window.location.href = "prize-pool.html";
     });
   }
 
-  // Load on start and refresh every 30s
-  loadPrizePool();
-  setInterval(loadPrizePool, 30000);
+  // Load on start and refresh every 30s — skipped in Free Tournament mode.
+  if (!FREE_TOURNAMENT_MODE) {
+    loadPrizePool();
+    setInterval(loadPrizePool, 30000);
+  }
+
+  // Free Tournament public mode — hides every Paid / wallet / Phantom /
+  // Solana surface on landing and promotes the free play button. No on-chain
+  // reads, no wallet code ever runs. Prize Pool pill is fully hidden by
+  // CSS (`body.free-tournament #landing-prize-pool`). Paid DOM / handlers
+  // remain in place so flipping FREE_TOURNAMENT_MODE back to false restores
+  // the Paid flow byte-for-byte.
+  if (FREE_TOURNAMENT_MODE) {
+    document.body.classList.add("free-tournament");
+    if (btnPlayFree) btnPlayFree.innerHTML = "▶ PLAY FREE";
+    // Tournament leaderboard load — gated on TOURNAMENT_ACTIVE so when the
+    // tournament is OFF we fire zero Supabase requests + leave the panel
+    // hidden (its default inline style is display:none).
+    if (TOURNAMENT_ACTIVE) {
+      refreshTournament();
+      setInterval(refreshTournament, 60000);
+    }
+  }
 
   // Cancel button closes overlay
   payCancelBtn.addEventListener("click", hidePayOverlay);
